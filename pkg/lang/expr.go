@@ -212,7 +212,7 @@ type PathExpr struct {
 func (pex PathExpr) Eval(core.Env) (score.Any, error) {
 	parts, err := pex.Path.Parts()
 	if err != nil {
-		return core.BoundPath{}, err
+		return nil, err
 	}
 
 	return core.BoundPath{

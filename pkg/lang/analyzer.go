@@ -3,6 +3,7 @@ package lang
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/spy16/slurp/builtin"
@@ -119,7 +120,6 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 		if parse, found := a.special[s]; found {
 			return parse(a, env, seq)
 		}
-
 	}
 
 	// Target is not a special form; resolve and evaluate to get an
@@ -130,13 +130,13 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 
 	// The call target is not a special form.  It is some kind of invokation.
 	// Unpack & analyze the args.
-	args, vargs, err := a.unpackArgs(env, seq)
+	args, err := a.unpackArgs(env, seq)
 	if err != nil {
 		return nil, err
 	}
 
-	as := make([]core.Expr, len(args)+len(vargs))
-	for i, arg := range append(args, vargs...) {
+	as := make([]core.Expr, len(args))
+	for i, arg := range args {
 		if as[i], err = a.analyze(env, arg); err != nil {
 			return nil, err
 		}
@@ -160,10 +160,10 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 
 	}
 
-	return nil, fmt.Errorf("%w '%s'", core.ErrNotInvokable, target.Value().Which())
+	return nil, fmt.Errorf("%w '%s'", core.ErrNotInvokable, reflect.TypeOf(target))
 }
 
-func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, vs []ww.Any, err error) {
+func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, err error) {
 	if seq == nil {
 		return
 	}
@@ -185,6 +185,7 @@ func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, vs []ww
 		return
 	}
 
+	// no unpacking?
 	if !strings.HasSuffix(sym, "...") {
 		return
 	}
@@ -230,8 +231,12 @@ func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, vs []ww
 
 	}
 
-	vs, err = core.ToSlice(seq)
 	args = args[:len(args)-1] // pop last
+	err = core.ForEach(seq, func(item ww.Any) (bool, error) {
+		args = append(args, item)
+		return false, nil
+	})
+
 	return
 }
 
