@@ -251,12 +251,17 @@ type prompt struct {
 type printer struct{}
 
 func (printer) Fprintln(w io.Writer, val interface{}) (err error) {
-	if val == nil {
-		return
-	}
+	switch v := val.(type) {
+	case nil:
+	case error:
+		_, err = fmt.Fprintf(w, "ERROR: %v\n", v)
+	case ww.Any:
+		s, err := core.Render(v)
+		if err != nil {
+			return err
+		}
 
-	if val, err = (printer{}).analyze(val); err == nil {
-		_, err = fmt.Fprintf(w, "ERROR: %v\n", val)
+		_, err = fmt.Fprintln(w, s)
 	}
 
 	return

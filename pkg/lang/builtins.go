@@ -1,11 +1,13 @@
 package lang
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
+	anchorpath "github.com/wetware/ww/pkg/util/anchor/path"
 	capnp "zombiezen.com/go/capnproto2"
 )
 
@@ -15,6 +17,7 @@ func loadBuiltins(env core.Env, a core.Analyzer) error {
 		text("__author__", "Louis Thibault"),
 		text("__copyright__", "2020, Louis Thibault\nAll rights reserved."),
 
+		anchor(),
 		comparison(),
 		container(),
 		function("nil?", "__isnil__", core.IsNil),
@@ -23,28 +26,6 @@ func loadBuiltins(env core.Env, a core.Analyzer) error {
 		function("read", "__read__", fnRead),
 		function("render", "__render__", core.Render),
 		function("print", "__print__", fnPrint))
-}
-
-func fnRead(any ww.Any) (core.List, error) {
-	return nil, errors.New("NOT IMPLEMENTED")
-}
-
-func fnNot(any ww.Any) (bool, error) {
-	b, err := core.IsTruthy(any)
-	return !b, err
-}
-
-func fnPrint(any ww.Any) (int, error) {
-	s, err := core.Render(any)
-	if err != nil {
-		return 0, err
-	}
-
-	return fmt.Print(s)
-}
-
-func fnTypeOf(a ww.Any) (core.Symbol, error) {
-	return core.NewSymbol(capnp.SingleSegment(nil), a.Value().Which().String())
 }
 
 // comparison operators for ordered types, including numericals.
@@ -71,6 +52,36 @@ func comparison() bindFunc {
 	}
 }
 
+// operations on anchors
+func anchor() bindFunc {
+	return func(env core.Env) error {
+		return bindAll(env,
+			function("ls", "__ls__", fnList))
+	}
+}
+
+func fnList(p core.BoundPath) (core.Vector, error) {
+	as, err := p.Anchor.Ls(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	var vec core.Vector = core.EmptyVector
+	for _, subanchor := range as {
+		path, err := core.NewPath(capnp.SingleSegment(nil),
+			anchorpath.Join(subanchor.Path()))
+		if err != nil {
+			return nil, err
+		}
+
+		if vec, err = vec.Cons(path); err != nil {
+			return nil, err
+		}
+	}
+
+	return vec, nil
+}
+
 // generic operations for lists, vectors, maps, sets and other collections.
 func container() bindFunc {
 	return func(env core.Env) error {
@@ -84,6 +95,28 @@ func container() bindFunc {
 
 func fnLen(c core.Countable) (int, error)   { return c.Count() }
 func fnNext(seq core.Seq) (core.Seq, error) { return seq.Next() }
+
+func fnRead(any ww.Any) (core.List, error) {
+	return nil, errors.New("NOT IMPLEMENTED")
+}
+
+func fnNot(any ww.Any) (bool, error) {
+	b, err := core.IsTruthy(any)
+	return !b, err
+}
+
+func fnPrint(any ww.Any) (int, error) {
+	s, err := core.Render(any)
+	if err != nil {
+		return 0, err
+	}
+
+	return fmt.Print(s)
+}
+
+func fnTypeOf(a ww.Any) (core.Symbol, error) {
+	return core.NewSymbol(capnp.SingleSegment(nil), a.Value().Which().String())
+}
 
 func text(symbol, str string) bindFunc {
 	return func(env core.Env) error {
