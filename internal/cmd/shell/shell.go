@@ -233,8 +233,13 @@ type linereader struct{ *readline.Instance }
 
 func (l linereader) Readline() (line string, err error) {
 	for {
-		if line, err = l.Instance.Readline(); err == readline.ErrInterrupt {
-			return "", nil
+		switch line, err = l.Instance.Readline(); err {
+		case nil:
+		case readline.ErrInterrupt:
+			line, err = "", nil
+			fallthrough
+		default:
+			l.Clean()
 		}
 
 		return
