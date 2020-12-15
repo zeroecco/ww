@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
@@ -89,12 +90,55 @@ func container() bindFunc {
 			function("len", "__len__", fnLen),
 			function("pop", "__pop__", core.Pop),
 			function("conj", "__conj__", core.Conj),
-			function("next", "__next__", fnNext))
+			function("next", "__next__", fnNext),
+			function("first", "__first__", fnFirst),
+			function("last", "__last__", fnLast))
 	}
 }
 
 func fnLen(c core.Countable) (int, error)   { return c.Count() }
 func fnNext(seq core.Seq) (core.Seq, error) { return seq.Next() }
+func fnFirst(c core.Countable) (ww.Any, error) {
+	cnt, err := c.Count()
+	if err != nil || cnt == 0 {
+		return core.Nil{}, err
+	}
+
+	switch item := c.(type) {
+	case core.Seq:
+		return item.First()
+
+	case core.Vector:
+		return item.EntryAt(0)
+
+	}
+
+	return nil, fmt.Errorf("first undefined for type '%s'", reflect.TypeOf(c))
+}
+func fnLast(c core.Countable) (ww.Any, error) {
+	cnt, err := c.Count()
+	if err != nil || cnt == 0 {
+		return core.Nil{}, err
+	}
+
+	switch item := c.(type) {
+	case core.Seq:
+		var any ww.Any
+		err = core.ForEach(item, func(item ww.Any) (bool, error) {
+			if cnt--; cnt == 0 {
+				any = item
+			}
+			return false, nil
+		})
+		return any, err
+
+	case core.Vector:
+		return item.EntryAt(cnt - 1)
+
+	}
+
+	return nil, fmt.Errorf("last undefined for type '%s'", reflect.TypeOf(c))
+}
 
 func fnRead(any ww.Any) (core.List, error) {
 	return nil, errors.New("NOT IMPLEMENTED")
