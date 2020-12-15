@@ -11,7 +11,6 @@ import (
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 	"github.com/wetware/ww/pkg/lang/reader"
-	anchorpath "github.com/wetware/ww/pkg/util/anchor/path"
 	memutil "github.com/wetware/ww/pkg/util/mem"
 	capnp "zombiezen.com/go/capnproto2"
 )
@@ -23,12 +22,10 @@ var (
 	_ core.Expr = (*DefExpr)(nil)
 	_ core.Expr = (*InvokeExpr)(nil)
 	_ core.Expr = (*PathExpr)(nil)
-	_ core.Expr = (*LocalGoExpr)(nil)
-	_ core.Expr = (*RemoteGoExpr)(nil)
+	// _ core.Expr = (*LocalGoExpr)(nil)
+	// _ core.Expr = (*RemoteGoExpr)(nil)
 	_ core.Expr = (*InvokeExpr)(nil)
 	// _ core.Expr = (*)(nil)
-
-	_ core.Invokable = (*PathExpr)(nil)
 )
 
 type (
@@ -207,64 +204,21 @@ func (ie InvokeExpr) Eval(env core.Env) (any score.Any, err error) {
 // PathExpr binds a path to an Anchor
 type PathExpr struct {
 	Root ww.Anchor
-	core.Path
+	Path core.UnboundPath
 }
 
-// Eval returns the PathExpr unmodified
-func (pex PathExpr) Eval(core.Env) (score.Any, error) { return pex, nil }
-
-// Invoke is the data selector for the Path type.  It gets/sets the value at the anchor
-// path.
-func (pex PathExpr) Invoke(args ...ww.Any) (ww.Any, error) {
-	path, err := pex.Parts()
+// Eval walks the specified path, starting from the root anchor,
+// and binds the result to the path.
+func (pex PathExpr) Eval(core.Env) (score.Any, error) {
+	parts, err := pex.Path.Parts()
 	if err != nil {
-		return nil, err
+		return core.BoundPath{}, err
 	}
 
-	anchor := pex.Root.Walk(context.Background(), path)
-
-	if len(args) == 0 {
-		return anchor.Load(context.Background())
-	}
-
-	err = anchor.Store(context.Background(), args[0])
-	if err != nil {
-		return nil, core.Error{
-			Cause:   err,
-			Message: anchorpath.Join(path),
-		}
-	}
-
-	return nil, nil
-}
-
-// PathListExpr fetches subanchors for a path
-type PathListExpr struct {
-	PathExpr
-	Args []ww.Any
-}
-
-// Eval calls ww.Anchor.Ls and returns a vector of paths
-func (plx PathListExpr) Eval(core.Env) (score.Any, error) {
-	path, err := plx.Path.Parts()
-	if err != nil {
-		return nil, err
-	}
-
-	as, err := plx.Root.Walk(context.Background(), path).Ls(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	ps := make([]ww.Any, len(as))
-	for i, a := range as {
-		ps[i], err = core.NewPath(capnp.SingleSegment(nil), anchorpath.Join(a.Path()))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return core.NewVector(capnp.SingleSegment(nil), ps...)
+	return core.BoundPath{
+		Any:    pex.Path.Any,
+		Anchor: pex.Root.Walk(context.TODO(), parts),
+	}, nil
 }
 
 // VectorExpr .
@@ -307,35 +261,35 @@ func (vex VectorExpr) Eval(env core.Env) (score.Any, error) {
 	return vex.Vector, nil
 }
 
-// LocalGoExpr starts a local process.  Local processes cannot be addressed by remote
-// hosts.
-type LocalGoExpr struct {
-	Args []ww.Any
-}
+// // LocalGoExpr starts a local process.  Local processes cannot be addressed by remote
+// // hosts.
+// type LocalGoExpr struct {
+// 	Args []ww.Any
+// }
 
-// Eval resolves starts the process.
-func (lx LocalGoExpr) Eval(env core.Env) (score.Any, error) {
-	return nil, errors.New("LocalGoExpr NOT IMPLEMENTED")
-}
+// // Eval resolves starts the process.
+// func (lx LocalGoExpr) Eval(env core.Env) (score.Any, error) {
+// 	return nil, errors.New("LocalGoExpr NOT IMPLEMENTED")
+// }
 
-// RemoteGoExpr starts a global process.  Global processes may be bound to an Anchor,
-// rendering them addressable by remote hosts.
-type RemoteGoExpr struct {
-	Root ww.Anchor
-	Path core.Path
-	Args []ww.Any
-}
+// // RemoteGoExpr starts a global process.  Global processes may be bound to an Anchor,
+// // rendering them addressable by remote hosts.
+// type RemoteGoExpr struct {
+// 	Root ww.Anchor
+// 	Path core.Path
+// 	Args []ww.Any
+// }
 
-// Eval resolves the anchor and starts the process.
-func (rx RemoteGoExpr) Eval(core.Env) (score.Any, error) {
-	path, err := rx.Path.Parts()
-	if err != nil {
-		return nil, err
-	}
+// // Eval resolves the anchor and starts the process.
+// func (rx RemoteGoExpr) Eval(core.Env) (score.Any, error) {
+// 	path, err := rx.Path.Parts()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return rx.Root.Walk(context.Background(), path).
-		Go(context.Background(), rx.Args...)
-}
+// 	return rx.Root.Walk(context.Background(), path).
+// 		Go(context.Background(), rx.Args...)
+// }
 
 // ImportExpr .
 type ImportExpr struct {

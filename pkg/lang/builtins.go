@@ -11,17 +11,18 @@ import (
 
 func loadBuiltins(env core.Env, a core.Analyzer) error {
 	return bindAll(env,
+		text("__version__", ww.Version),
+		text("__author__", "Louis Thibault"),
+		text("__copyright__", "2020, Louis Thibault\nAll rights reserved."),
+
 		comparison(),
+		container(),
 		function("nil?", "__isnil__", core.IsNil),
+		function("type", "__type__", fnTypeOf),
 		function("not", "__not__", fnNot),
 		function("read", "__read__", fnRead),
 		function("render", "__render__", core.Render),
-		function("print", "__print__", fnPrint),
-		function("len", "__len__", fnLen),
-		function("pop", "__pop__", core.Pop),
-		function("conj", "__conj__", core.Conj),
-		function("type", "__type__", fnTypeOf),
-		function("next", "__next__", fnNext))
+		function("print", "__print__", fnPrint))
 }
 
 func fnRead(any ww.Any) (core.List, error) {
@@ -38,17 +39,15 @@ func fnPrint(any ww.Any) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return fmt.Print(s)
 }
-
-func fnLen(c core.Countable) (int, error) { return c.Count() }
 
 func fnTypeOf(a ww.Any) (core.Symbol, error) {
 	return core.NewSymbol(capnp.SingleSegment(nil), a.Value().Which().String())
 }
 
-func fnNext(seq core.Seq) (core.Seq, error) { return seq.Next() }
-
+// comparison operators for ordered types, including numericals.
 func comparison() bindFunc {
 	return func(env core.Env) error {
 		return bindAll(env,
@@ -69,6 +68,31 @@ func comparison() bindFunc {
 				i, err := a.Comp(b)
 				return i >= 0, err
 			}))
+	}
+}
+
+// generic operations for lists, vectors, maps, sets and other collections.
+func container() bindFunc {
+	return func(env core.Env) error {
+		return bindAll(env,
+			function("len", "__len__", fnLen),
+			function("pop", "__pop__", core.Pop),
+			function("conj", "__conj__", core.Conj),
+			function("next", "__next__", fnNext))
+	}
+}
+
+func fnLen(c core.Countable) (int, error)   { return c.Count() }
+func fnNext(seq core.Seq) (core.Seq, error) { return seq.Next() }
+
+func text(symbol, str string) bindFunc {
+	return func(env core.Env) error {
+		s, err := core.NewString(capnp.SingleSegment(nil), str)
+		if err != nil {
+			return err
+		}
+
+		return env.Bind(symbol, s)
 	}
 }
 

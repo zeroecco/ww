@@ -53,15 +53,15 @@ func TestLang(t *testing.T) {
 	require.NoError(t, err)
 
 	var res interface{}
-	for i, f := range forms {
-		sexpr, err := core.Render(f.(ww.Any))
+	for i, form := range forms {
+		s, err := core.Render(form.(ww.Any))
 		require.NoError(t, err, "error rendering form for debugging")
 
 		assert.NotPanics(t, func() {
-			if res, err = vm.Eval(f); err != nil {
-				require.NoError(t, err, "line %d: %s", i+1, sexpr)
+			if res, err = vm.Eval(form); err != nil {
+				require.NoError(t, err, "line %d: %s", i+1, s)
 			}
-		}, "line %d: %s", i+1, sexpr)
+		}, "line %d: %s", i+1, s)
 	}
 
 	b, ok := res.(core.Bool)

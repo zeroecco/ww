@@ -17,9 +17,8 @@ import (
 	"github.com/wetware/ww/internal/cmd/keygen"
 	"github.com/wetware/ww/internal/cmd/shell"
 	"github.com/wetware/ww/internal/cmd/start"
+	ww "github.com/wetware/ww/pkg"
 )
-
-const version = "0.0.0"
 
 var flags = []cli.Flag{
 	&cli.StringFlag{
@@ -57,7 +56,7 @@ func main() {
 		Usage:                "the distributed programming language",
 		UsageText:            "ww [global options] command [command options] [arguments...]",
 		Copyright:            "2020 The Wetware Project",
-		Version:              version,
+		Version:              ww.Version,
 		EnableBashCompletion: true,
 		Flags:                flags,
 		Commands:             commands,

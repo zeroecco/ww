@@ -37,7 +37,6 @@ func newAnalyzer(root ww.Anchor, paths []string) (core.Analyzer, error) {
 			"macro": parseMacro,
 			"quote": parseQuote,
 			// "go": c.Go,
-			"ls":     lsParser(root),
 			"eval":   parseEval,
 			"import": importer(paths).Parse,
 		},
@@ -70,7 +69,7 @@ func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 	case core.Symbol:
 		return ResolveExpr{f}, nil
 
-	case core.Path:
+	case core.UnboundPath:
 		return PathExpr{
 			Root: a.root,
 			Path: f,
@@ -121,10 +120,12 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 			return parse(a, env, seq)
 		}
 
-		// symbol is not a special form; resolve.
-		if target, err = a.Eval(env, target); err != nil {
-			return nil, err
-		}
+	}
+
+	// Target is not a special form; resolve and evaluate to get an
+	// invokable value or function.
+	if target, err = a.Eval(env, target); err != nil {
+		return nil, err
 	}
 
 	// The call target is not a special form.  It is some kind of invokation.
@@ -159,10 +160,7 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 
 	}
 
-	return nil, core.Error{
-		Cause:   core.ErrNotInvokable,
-		Message: fmt.Sprintf("'%s'", target.Value().Which()),
-	}
+	return nil, fmt.Errorf("%w '%s'", core.ErrNotInvokable, target.Value().Which())
 }
 
 func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, vs []ww.Any, err error) {

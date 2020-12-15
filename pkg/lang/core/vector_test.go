@@ -68,7 +68,7 @@ func TestEmptyVector(t *testing.T) {
 	t.Run("Render", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := core.EmptyVector.Render()
+		s, err := core.Render(core.EmptyVector)
 		assert.NoError(t, err)
 		assert.Equal(t, "[]", s)
 	})

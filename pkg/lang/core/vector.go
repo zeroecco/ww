@@ -107,8 +107,7 @@ func (EmptyPersistentVector) Invoke(args ...ww.Any) (ww.Any, error) {
 	return invokeVector(EmptyVector, args)
 }
 
-// Render the vector in a human-readable format.
-func (EmptyPersistentVector) Render() (string, error) { return "[]", nil }
+func (EmptyPersistentVector) String() string { return "[]" }
 
 // EntryAt returns ErrIndexOutOfBounds
 func (EmptyPersistentVector) EntryAt(int) (ww.Any, error) { return nil, ErrIndexOutOfBounds }
@@ -244,8 +243,9 @@ func (v ShallowPersistentVector) Invoke(args ...ww.Any) (ww.Any, error) {
 	return invokeVector(v, args)
 }
 
-// Render the vector in a human-readable format.
-func (v ShallowPersistentVector) Render() (string, error) {
+// String returns a human-readable representation of the vector that
+// is suitable for printing.
+func (v ShallowPersistentVector) String() (string, error) {
 	vec, err := v.Any.Vector()
 	if err != nil {
 		return "", err
@@ -583,8 +583,9 @@ func (v DeepPersistentVector) Invoke(args ...ww.Any) (ww.Any, error) {
 	return invokeVector(v, args)
 }
 
-// Render the vector in a human-readable format.
-func (v DeepPersistentVector) Render() (string, error) {
+// String returns a human-readable representation of the vector that is
+// suitable for printing.
+func (v DeepPersistentVector) String() (string, error) {
 	cnt, err := v.Count()
 	if err != nil {
 		return "", err

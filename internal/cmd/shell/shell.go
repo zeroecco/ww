@@ -4,7 +4,6 @@ package shell
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os/user"
@@ -26,7 +25,6 @@ import (
 	"github.com/wetware/ww/pkg/lang"
 	"github.com/wetware/ww/pkg/lang/core"
 	"github.com/wetware/ww/pkg/lang/reader"
-	anchorpath "github.com/wetware/ww/pkg/util/anchor/path"
 )
 
 const bannerTemplate = `Wetware v{{.App.Version}}
@@ -257,14 +255,14 @@ func (printer) Fprintln(w io.Writer, val interface{}) (err error) {
 		return
 	}
 
-	if val, err = (printer{}).render(val); err == nil {
-		_, err = fmt.Fprintln(w, val)
+	if val, err = (printer{}).analyze(val); err == nil {
+		_, err = fmt.Fprintf(w, "ERROR: %v\n", val)
 	}
 
 	return
 }
 
-func (printer) render(val interface{}) (interface{}, error) {
+func (printer) analyze(val interface{}) (interface{}, error) {
 	if any, ok := val.(ww.Any); ok {
 		return core.Render(any)
 	}
@@ -297,44 +295,6 @@ func newBanner(c *cli.Context) (b banner, err error) {
 	}
 
 	return
-}
-
-type nopAnchor []string
-
-func (a nopAnchor) Name() string {
-	if anchorpath.Root(a) {
-		return ""
-	}
-
-	return a[len(a)-1]
-}
-
-func (a nopAnchor) Path() []string { return a }
-
-func (nopAnchor) Ls(context.Context) ([]ww.Anchor, error) {
-	return []ww.Anchor{}, nil
-}
-
-func (a nopAnchor) Walk(_ context.Context, path []string) ww.Anchor {
-	return append(a, path...)
-}
-
-func (a nopAnchor) Load(context.Context) (ww.Any, error) {
-	// TODO:  return something for /
-
-	return nil, errors.New("not found")
-}
-
-func (a nopAnchor) Store(context.Context, ww.Any) error {
-	if anchorpath.Root(a) {
-		return errors.New("not implemented")
-	}
-
-	return errors.New("not found")
-}
-
-func (a nopAnchor) Go(context.Context, ...ww.Any) (ww.Any, error) {
-	return nil, errors.New("not implemented")
 }
 
 func fxLogger(c *cli.Context) fx.Option {

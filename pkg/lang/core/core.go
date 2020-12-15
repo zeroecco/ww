@@ -29,7 +29,7 @@ var (
 	ErrArity = core.ErrArity
 
 	// ErrNotInvokable is returned by InvokeExpr when the target is not invokable.
-	ErrNotInvokable = core.ErrNotInvokable
+	ErrNotInvokable = errors.New("non-invokable type")
 
 	// ErrIllegalState is returned when an operation is attempted against a datatype
 	// that has the right type but an inappropriate value.
@@ -100,28 +100,57 @@ type EqualityProvider interface {
 	Eq(ww.Any) (bool, error)
 }
 
-// Renderable types provide a human-readable representation.
-type Renderable interface {
-	Render() (string, error)
+// ErrStringer is equivalent to fmt.Stringer, except that it may return a
+// non-nil error.
+type ErrStringer interface {
+	String() (string, error)
 }
 
-// Render a value into a human-readable representation.
-// To serialize a value into a parseable s-expression, see core.SExpressable.
-func Render(v ww.Any) (string, error) {
-	switch val := v.(type) {
-	case Renderable:
-		return val.Render()
+// Render a value into a human-readable representation suitable for printing.
+// Ouptut from Render IS NOT guaranteed to be parseable by reader.Reader.
+func Render(item ww.Any) (string, error) {
+	switch any := item.Value(); any.Which() {
+	case mem.Any_Which_nil:
+		return "nil", nil
 
-	case Seq:
-		return renderSeq(val)
+	case mem.Any_Which_bool:
+		return Bool{any}.String(), nil
 
-	case fmt.Stringer:
-		return val.String(), nil
+	case mem.Any_Which_str:
+		return any.Str()
 
-	default:
-		return fmt.Sprintf("%#v", val), nil
+	case mem.Any_Which_symbol:
+		return any.Symbol()
+
+	case mem.Any_Which_keyword:
+		return Keyword{any}.String()
+
+	case mem.Any_Which_path:
+		return UnboundPath{any}.String()
+
+	case mem.Any_Which_char:
+		return Char{any}.String(), nil
+
+	case mem.Any_Which_i64:
+		return Int64{any}.String(), nil
+
+	case mem.Any_Which_f64:
+		return Float64{any}.String(), nil
 
 	}
+
+	switch v := item.(type) {
+	case ErrStringer:
+		return v.String()
+
+	case Seq:
+		return seqToString(v)
+
+	case fmt.Stringer:
+		return v.String(), nil
+	}
+
+	return fmt.Sprintf("%#v", item), nil
 }
 
 // IsNil returns true if value is native go `nil` or `Nil{}`.
@@ -261,9 +290,9 @@ func AsAny(any mem.Any) (item ww.Any, err error) {
 	case mem.Any_Which_bool:
 		item = Bool{any}
 	case mem.Any_Which_i64:
-		item = i64{any}
+		item = Int64{any}
 	case mem.Any_Which_f64:
-		item = f64{any}
+		item = Float64{any}
 	case mem.Any_Which_bigInt:
 		item, err = asBigInt(any)
 	case mem.Any_Which_bigFloat:
@@ -279,7 +308,7 @@ func AsAny(any mem.Any) (item ww.Any, err error) {
 	case mem.Any_Which_symbol:
 		item = Symbol{any}
 	case mem.Any_Which_path:
-		item = Path{any}
+		item = UnboundPath{any}
 	case mem.Any_Which_list:
 		item, err = asList(any)
 	case mem.Any_Which_vector:

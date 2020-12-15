@@ -13,6 +13,10 @@ import (
 )
 
 const (
+	// Version follows Semantic Versioning 2.0.0 conventions
+	// https://semver.org/
+	Version = "0.0.0"
+
 	// DefaultNamespace .
 	DefaultNamespace = "ww"
 

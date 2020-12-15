@@ -14,23 +14,28 @@ var (
 
 	//False value of Bool
 	False Bool
+
+	// // RootPath designates the entire cluster.
+	// RootPath Path
 )
 
 func init() {
 	var err error
-	if True, err = NewBool(capnp.SingleSegment(nil), true); err != nil {
+	if True, err = mkBool(capnp.SingleSegment(nil), true); err != nil {
 		panic(err)
 	}
 
-	if False, err = NewBool(capnp.SingleSegment(nil), false); err != nil {
+	if False, err = mkBool(capnp.SingleSegment(nil), false); err != nil {
 		panic(err)
 	}
+
+	// if RootPath, err = mkRootPath(capnp.SingleSegment(nil)); err != nil {
+	// 	panic(err)
+	// }
 }
 
 // Nil represents a null value.
 type Nil struct{}
-
-func (Nil) String() string { return "nil" }
 
 // Value returns the memory value.
 func (Nil) Value() mem.Any { return mem.Any{} }
@@ -39,7 +44,15 @@ func (Nil) Value() mem.Any { return mem.Any{} }
 type Bool struct{ mem.Any }
 
 // NewBool using the built-in implementation.
-func NewBool(a capnp.Arena, b bool) (Bool, error) {
+func NewBool(b bool) Bool {
+	if b {
+		return True
+	}
+
+	return False
+}
+
+func mkBool(a capnp.Arena, b bool) (Bool, error) {
 	any, err := memutil.Alloc(a)
 	if err == nil {
 		any.SetBool(b)
@@ -52,7 +65,7 @@ func NewBool(a capnp.Arena, b bool) (Bool, error) {
 func (b Bool) Value() mem.Any { return b.Any }
 
 // Bool returns the boolean value.
-func (b Bool) Bool() bool { return b.Value().Bool() }
+func (b Bool) Bool() bool { return b.Any.Bool() }
 
 func (b Bool) String() string {
 	if b.Bool() {
@@ -79,10 +92,7 @@ func NewChar(a capnp.Arena, r rune) (Char, error) {
 // Value returns the memory value
 func (c Char) Value() mem.Any { return c.Any }
 
-// Char returns the character as a native rune.
-func (c Char) Char() rune { return c.Value().Char() }
-
-func (c Char) String() string { return fmt.Sprintf("\\%c", c.Char()) }
+func (c Char) String() string { return fmt.Sprintf("%c", c.Any.Char()) }
 
 // String represents text. Escape sequences are not applicable at this level.
 type String struct{ mem.Any }
@@ -100,20 +110,9 @@ func NewString(a capnp.Arena, s string) (String, error) {
 // Value returns the memory value
 func (str String) Value() mem.Any { return str.Any }
 
-func (str String) String() (s string, err error) {
-	if s, err = str.Value().Str(); err == nil {
-		s = "\"" + s + "\""
-	}
-
-	return
-}
-
-// Render the string into a parseable s-expression.
-func (str String) Render() (string, error) { return str.String() }
-
 // Count returns the number of characters in the string.
 func (str String) Count() (int, error) {
-	s, err := str.Value().Str()
+	s, err := str.Any.Str()
 	return len(s), err
 }
 
@@ -133,12 +132,10 @@ func NewKeyword(a capnp.Arena, s string) (Keyword, error) {
 // Value returns the memory value
 func (kw Keyword) Value() mem.Any { return kw.Any }
 
-// Keyword returns the keyword's value as a native string.
-func (kw Keyword) Keyword() (string, error) { return kw.Value().Keyword() }
-
-// Render the keyword into a human-readable string.
-func (kw Keyword) Render() (string, error) {
-	s, err := kw.Keyword()
+// String returns a human-readable representation of the keyword that is
+// suitable for printing.
+func (kw Keyword) String() (string, error) {
+	s, err := kw.Any.Keyword()
 	if err != nil {
 		return "", err
 	}
@@ -161,9 +158,3 @@ func NewSymbol(a capnp.Arena, s string) (Symbol, error) {
 
 // Value returns the memory value
 func (sym Symbol) Value() mem.Any { return sym.Any }
-
-// Symbol returns the symbol's value as a native string.
-func (sym Symbol) Symbol() (string, error) { return sym.Value().Symbol() }
-
-// Render the symbol into a human-readable string.
-func (sym Symbol) Render() (string, error) { return sym.Symbol() }

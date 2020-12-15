@@ -115,7 +115,7 @@ func SeqString(seq Seq, begin, end, sep string) (string, error) {
 	return strings.TrimRight(b.String(), sep) + end, err
 }
 
-func renderSeq(seq Seq) (string, error) {
+func seqToString(seq Seq) (string, error) {
 	var b strings.Builder
 	b.WriteRune('(')
 

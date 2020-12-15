@@ -29,8 +29,9 @@ type Fn struct{ mem.Any }
 // Value returns the memory value
 func (fn Fn) Value() mem.Any { return fn.Any }
 
-// Render a human-readable representation of the function
-func (fn Fn) Render() (string, error) {
+// String returns a human-readable representation of the function that
+// is suitable for printing.
+func (fn Fn) String() (string, error) {
 	// TODO:  more detail in rendering.
 	return fn.Name()
 
