@@ -129,12 +129,13 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 	}
 
 	// The call target is not a special form.  It is some kind of invokation.
-	// Unpack & analyze the args.
+	// Unpack arguments.
 	args, err := a.unpackArgs(env, seq)
 	if err != nil {
 		return nil, err
 	}
 
+	// Analyze arguments.
 	as := make([]core.Expr, len(args))
 	for i, arg := range args {
 		if as[i], err = a.analyze(env, arg); err != nil {
