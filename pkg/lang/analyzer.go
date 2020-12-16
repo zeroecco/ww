@@ -84,7 +84,7 @@ func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 		return a.analyzeSeq(env, f)
 
 	case core.Fn:
-		return FnExpr{Fn: f}, nil
+		return FnExpr{Analyzer: a, Fn: f}, nil
 
 	}
 

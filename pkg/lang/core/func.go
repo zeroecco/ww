@@ -26,7 +26,6 @@ type CallTarget struct {
 
 // Call evaluates the body.
 func (t CallTarget) Call(a Analyzer, env Env) (any ww.Any, err error) {
-	var res interface{}
 	for i := 0; i < t.Body.Len(); i++ {
 		if any, err = AsAny(t.Body.At(i)); err != nil {
 			return
@@ -37,11 +36,11 @@ func (t CallTarget) Call(a Analyzer, env Env) (any ww.Any, err error) {
 		}
 	}
 
-	if res == nil {
+	if any == nil {
 		return Nil{}, nil
 	}
 
-	return res.(ww.Any), nil
+	return any, nil
 }
 
 // BoundFn is a function bound to a local env.
@@ -127,26 +126,32 @@ func (fn Fn) Match(nargs int) (CallTarget, error) {
 
 	var f mem.Fn_Func
 	for i := 0; i < fs.Len(); i++ {
-		f = fs.At(i)
+		switch f = fs.At(i); f.Which() {
+		case mem.Fn_Func_Which_nilary:
+			if nargs != 0 {
+				continue
+			}
 
-		// if there are no params -> must have 0 args
-		if !f.HasParams() && nargs == 0 {
 			body, err := f.Body()
 			return CallTarget{Body: body}, err
-		}
 
-		ps, err := f.Params()
-		if err != nil {
-			return CallTarget{}, err
-		}
+		case mem.Fn_Func_Which_params:
+			ps, err := f.Params()
+			if err != nil {
+				return CallTarget{}, err
+			}
 
-		nparam := ps.Len()
-		if f.Variadic() && nargs >= nparam-1 {
+			nparam := ps.Len()
 			body, err := f.Body()
-			return CallTarget{Body: body, Param: ps, Variadic: true}, err
-		} else if nargs == nparam {
-			body, err := f.Body()
-			return CallTarget{Body: body, Param: ps}, err
+
+			if f.Variadic() && nargs >= nparam-1 {
+				return CallTarget{Body: body, Param: ps, Variadic: true}, err
+			}
+
+			if nargs == nparam {
+				body, err := f.Body()
+				return CallTarget{Body: body, Param: ps}, err
+			}
 		}
 	}
 
