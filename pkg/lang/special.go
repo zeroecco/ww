@@ -237,7 +237,7 @@ func parseEval(a core.Analyzer, env core.Env, seq core.Seq) (core.Expr, error) {
 
 type importer []string
 
-func (i importer) Parse(a core.Analyzer, env core.Env, seq core.Seq) (core.Expr, error) {
+func (i importer) Parse(a core.Analyzer, _ core.Env, seq core.Seq) (core.Expr, error) {
 	if cnt, err := seq.Count(); err != nil {
 		return nil, err
 	} else if cnt != 1 {
@@ -249,48 +249,42 @@ func (i importer) Parse(a core.Analyzer, env core.Env, seq core.Seq) (core.Expr,
 		return nil, err
 	}
 
-	iex := ImportExpr{Analyzer: a}
-
+	var s string
+	var paths []string
 	switch mv := arg.Value(); mv.Which() {
 	case mem.Any_Which_keyword:
-		kw, err := mv.Keyword()
-		if err != nil {
+		if s, err = mv.Keyword(); err != nil {
 			return nil, err
 		}
 
-		if kw != "prelude" {
-			return nil, fmt.Errorf("unrecognize kwarg '%s'", kw)
+		if s != "prelude" {
+			return nil, fmt.Errorf("unrecognize kwarg '%s'", s)
 		}
 
-		ps, err := i.init(a, env)
-		if err != nil {
-			return nil, err
+		for _, s = range i {
+			if s, err = i.resolvePath(s, ""); err == nil {
+				paths = append(paths, s)
+			}
 		}
-
-		iex.Paths = append(iex.Paths, ps...)
 
 	case mem.Any_Which_symbol:
-		sym, err := mv.Symbol()
-		if err != nil {
+		if s, err = mv.Symbol(); err != nil {
 			return nil, err
 		}
 
-		path, err := i.symbolToPath(sym)
-		if err != nil {
-			return nil, fmt.Errorf("import error: %w", err)
+		if s, err = i.resolve(s); err == nil {
+			paths = append(paths, s)
 		}
 
-		iex.Paths = append(iex.Paths, path)
-
 	default:
-		return nil, fmt.Errorf("invalid argument type %s", mv.Which())
+		err = fmt.Errorf("invalid argument type %s", mv.Which())
 
 	}
 
-	return iex, nil
+	return ImportExpr{Analyzer: a, Paths: paths}, err
 }
 
-func (i importer) init(a core.Analyzer, env core.Env) (paths []string, err error) {
+func (i importer) loadPrelude() (paths []string, err error) {
 	var files []os.FileInfo
 	for _, path := range i {
 		if files, err = ioutil.ReadDir(path); err != nil {
@@ -307,16 +301,31 @@ func (i importer) init(a core.Analyzer, env core.Env) (paths []string, err error
 	return
 }
 
-func (i importer) symbolToPath(symbol string) (path string, err error) {
-	subpath := strings.ReplaceAll(symbol, ".", string(os.PathSeparator))
-	subpath = filepath.Clean(subpath) + ".ww"
+func (i importer) resolve(symbol string) (path string, err error) {
+	if symbol[0] == '.' {
+		return i.resolvePath(".", strings.TrimLeft(symbol, "."))
+	}
 
 	for _, root := range i {
-		path = filepath.Join(root, subpath)
-		if _, err = os.Stat(path); !os.IsNotExist(err) {
-			return
+		if path, err = i.resolvePath(root, symbol); err == nil {
+			break
 		}
 	}
 
-	return "", core.ErrNotFound
+	return path, err
+}
+
+func (importer) resolvePath(root, rel string) (string, error) {
+	path := filepath.Clean(filepath.Join(root, rel))
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+
+	if info.IsDir() {
+		path = filepath.Join(path, "__init__.ww")
+		_, err = os.Stat(path)
+	}
+
+	return path, err
 }

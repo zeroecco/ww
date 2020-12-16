@@ -1,5 +1,7 @@
 ;; Package fmt implements formatted I/O with functions analogous to C's printf and scanf.
 ;; The format 'verbs' follow Go conventions.
 
-(defn println [xs...]
-    (print "NOT IMPLEMENTED"))
+;; (defn println [xs...]
+;;     (print "NOT IMPLEMENTED"))
+
+(error "package 'fmt' not implemented")

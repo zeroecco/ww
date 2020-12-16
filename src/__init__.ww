@@ -1,4 +1,6 @@
-;; core definitions for the Wetaware language
+;; Default setup for all Wetware environments.
 
 ;; (defn <name> [<args>*] <body...>)
 
+;; DEBUG: sentinel value used to test if prelude initialization works
+(def sentinel true)

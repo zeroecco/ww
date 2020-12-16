@@ -21,6 +21,7 @@ func loadBuiltins(env core.Env, a core.Analyzer) error {
 		anchor(),
 		comparison(),
 		container(),
+		function("error", "__error__", core.Raise),
 		function("nil?", "__isnil__", core.IsNil),
 		function("type", "__type__", fnTypeOf),
 		function("not", "__not__", fnNot),

@@ -289,6 +289,16 @@ func Conj(any ww.Any, xs ...ww.Any) (Container, error) {
 	return nil, fmt.Errorf("cannot conj with %T", any)
 }
 
+// Raise a value as an error.
+func Raise(any ww.Any) error {
+	s, err := Render(any)
+	if err != nil {
+		return err
+	}
+
+	return errors.New(s)
+}
+
 // Canonical representation of an arbitrary value.
 func Canonical(any ww.Any) ([]byte, error) {
 	return capnp.Canonicalize(any.Value().Struct)
