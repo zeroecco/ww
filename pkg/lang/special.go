@@ -200,32 +200,6 @@ func parseFnDef(env core.Env, seq core.Seq, macro bool) (ww.Any, error) {
 	return b.Commit()
 }
 
-// func lsParser(root ww.Anchor) SpecialParser {
-// 	return func(a core.Analyzer, _ core.Env, seq core.Seq) (core.Expr, error) {
-// 		args, err := core.ToSlice(seq)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-
-// 		pexpr := PathExpr{Root: root, Path: core.RootPath}
-// 		for _, arg := range args {
-// 			if arg.Value().Which() == mem.Any_Which_path {
-// 				pexpr.Path = args[0].(core.Path)
-// 				args = args[1:]
-// 			}
-
-// 			break
-// 		}
-
-// 		// TODO(enhancement):  other args like `:long` or `:recursive`
-
-// 		return PathListExpr{
-// 			PathExpr: pexpr,
-// 			Args:     args,
-// 		}, nil
-// 	}
-// }
-
 func parseGo(a core.Analyzer, env core.Env, seq core.Seq) (core.Expr, error) {
 	return nil, errors.New("parseGo NOT IMPLEMENTED")
 	// args, err := core.ToSlice(seq)

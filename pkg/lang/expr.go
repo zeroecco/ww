@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/spy16/slurp/builtin"
 	score "github.com/spy16/slurp/core"
@@ -29,9 +31,6 @@ var (
 )
 
 type (
-	// DoExpr represents the (do expr*) form.
-	DoExpr = builtin.DoExpr
-
 	// QuoteExpr expression represents a quoted form
 	QuoteExpr = builtin.QuoteExpr
 )
@@ -42,6 +41,25 @@ type ConstExpr struct{ Form ww.Any }
 
 // Eval returns the constant value unmodified.
 func (ce ConstExpr) Eval(_ core.Env) (score.Any, error) { return ce.Form, nil }
+
+// DoExpr represents the (do expr*) form.
+type DoExpr struct{ Exprs []core.Expr }
+
+// Eval evaluates each expr in the do form in the order and returns the
+// result of the last eval.
+func (de DoExpr) Eval(env core.Env) (res score.Any, err error) {
+	for _, expr := range de.Exprs {
+		if res, err = expr.Eval(env); err != nil {
+			return
+		}
+	}
+
+	if res == nil {
+		return core.Nil{}, nil
+	}
+
+	return res, nil
+}
 
 // IfExpr represents the if-then-else form.
 type IfExpr struct{ Test, Then, Else core.Expr }
@@ -124,81 +142,51 @@ func (de DefExpr) Eval(env core.Env) (score.Any, error) {
 	return core.NewSymbol(capnp.SingleSegment(nil), de.Name)
 }
 
-// CallExpr invokes a function body when evaluated.
-type CallExpr struct {
+// FnExpr binds an env to a call target.
+type FnExpr struct {
 	Fn       core.Fn
 	Analyzer core.Analyzer
-	Args     []core.Expr
 }
 
-// Eval calls the function.
-func (cex CallExpr) Eval(env core.Env) (score.Any, error) {
-	// Get the call target that corresponds to the number of
-	// arguments supplied.
-	ct, err := cex.Fn.Match(len(cex.Args))
-	if err != nil {
-		return nil, err
-	}
-
-	// Bind evaluated arguments to parameter names to build
-	// a map of local variables.
-	scope := make(map[string]score.Any, len(ct.Param))
-	var vargs []ww.Any
-	for i, arg := range cex.Args {
-		any, err := arg.Eval(env)
-		if err != nil {
-			return nil, err
-		}
-
-		if ct.Variadic && i >= len(ct.Param)-1 {
-			vargs = append(vargs, any.(ww.Any))
-			continue
-		}
-
-		scope[ct.Param[i]] = any
-	}
-
-	if vargs != nil {
-		vs, err := core.NewList(capnp.SingleSegment(nil), vargs...)
-		if err != nil {
-			return nil, err
-		}
-
-		scope[ct.Param[len(ct.Param)-1]] = vs
-	}
-
-	// Analyze the call target's body to obtain evaluable expressions.
-	body := make([]core.Expr, len(ct.Body))
-	for i, form := range ct.Body {
-		if body[i], err = cex.Analyzer.Analyze(env, form); err != nil {
-			return nil, err
-		}
-	}
-
-	// Derive a child environment and evaluate the function body as a
-	// do expression.
-	return DoExpr{Exprs: body}.Eval(env.Child(ct.Name, scope))
+// Eval binds the environment to a call target
+func (fex FnExpr) Eval(env core.Env) (score.Any, error) {
+	name, err := fex.Fn.Name()
+	return core.BoundFn{
+		Analyzer: fex.Analyzer,
+		Fn:       fex.Fn,
+		Env:      env.Child(name, nil),
+	}, err
 }
 
 // InvokeExpr performs invocation of target when evaluated.
 type InvokeExpr struct {
-	Target core.Invokable
+	Target core.Expr
 	Args   []core.Expr
 }
 
 // Eval evaluates the target expr and invokes the result if it is an
 // Invokable  Returns error otherwise.
 func (ie InvokeExpr) Eval(env core.Env) (any score.Any, err error) {
+	if any, err = ie.Target.Eval(env); err != nil {
+		return
+	}
+
+	fn, ok := any.(core.Invokable)
+	if !ok {
+		err = fmt.Errorf("%w '%s'", core.ErrNotInvokable, reflect.TypeOf(any))
+		return
+	}
+
 	args := make([]ww.Any, len(ie.Args))
-	for i, ae := range ie.Args {
-		if any, err = ae.Eval(env); err != nil {
+	for i, arg := range ie.Args {
+		if any, err = arg.Eval(env); err != nil {
 			return
 		}
 
 		args[i] = any.(ww.Any)
 	}
 
-	return ie.Target.Invoke(args...)
+	return fn.Invoke(args)
 }
 
 // PathExpr binds a path to an Anchor
@@ -260,36 +248,6 @@ func (vex VectorExpr) Eval(env core.Env) (score.Any, error) {
 
 	return vex.Vector, nil
 }
-
-// // LocalGoExpr starts a local process.  Local processes cannot be addressed by remote
-// // hosts.
-// type LocalGoExpr struct {
-// 	Args []ww.Any
-// }
-
-// // Eval resolves starts the process.
-// func (lx LocalGoExpr) Eval(env core.Env) (score.Any, error) {
-// 	return nil, errors.New("LocalGoExpr NOT IMPLEMENTED")
-// }
-
-// // RemoteGoExpr starts a global process.  Global processes may be bound to an Anchor,
-// // rendering them addressable by remote hosts.
-// type RemoteGoExpr struct {
-// 	Root ww.Anchor
-// 	Path core.Path
-// 	Args []ww.Any
-// }
-
-// // Eval resolves the anchor and starts the process.
-// func (rx RemoteGoExpr) Eval(core.Env) (score.Any, error) {
-// 	path, err := rx.Path.Parts()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return rx.Root.Walk(context.Background(), path).
-// 		Go(context.Background(), rx.Args...)
-// }
 
 // ImportExpr .
 type ImportExpr struct {

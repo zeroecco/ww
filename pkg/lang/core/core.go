@@ -47,10 +47,6 @@ type (
 	// Env represents the environment in which forms are evaluated.
 	Env = core.Env
 
-	// Analyzer implementation is responsible for performing syntax analysis
-	// on given form.
-	Analyzer = core.Analyzer
-
 	// Expr represents an expression that can be evaluated against an env.
 	Expr = core.Expr
 
@@ -63,16 +59,32 @@ type (
 // It binds the prelude to the environment before returning.
 func New() Env { return core.New(nil) }
 
+// Analyzer implementation is responsible for performing syntax analysis
+// on given form.
+type Analyzer interface {
+	core.Analyzer
+}
+
 // Eval a form.
-func Eval(env Env, a Analyzer, form core.Any) (core.Any, error) {
-	return core.Eval(env, a, form)
+func Eval(env Env, a Analyzer, form ww.Any) (ww.Any, error) {
+	expr, err := a.Analyze(env, form)
+	if err != nil || expr == nil {
+		return nil, err
+	}
+
+	res, err := expr.Eval(env)
+	if err != nil || res == nil {
+		return Nil{}, err
+	}
+
+	return res.(ww.Any), nil
 }
 
 // Invokable represents a value that can be invoked as a function.
 type Invokable interface {
 	// Invoke is called if this value appears as the first argument of
 	// invocation form (i.e., list).
-	Invoke(args ...ww.Any) (ww.Any, error)
+	Invoke(args []ww.Any) (ww.Any, error)
 }
 
 // Countable types can report the number of elements they contain.

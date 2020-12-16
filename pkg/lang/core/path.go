@@ -94,7 +94,7 @@ func (p BoundPath) String() (string, error) {
 }
 
 // Invoke is used to get/set the anchor's value.
-func (p BoundPath) Invoke(args ...ww.Any) (ww.Any, error) {
+func (p BoundPath) Invoke(args []ww.Any) (ww.Any, error) {
 	switch len(args) {
 	case 0:
 		return p.Anchor.Load(context.TODO())

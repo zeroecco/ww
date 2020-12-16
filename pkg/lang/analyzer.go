@@ -2,8 +2,6 @@ package lang
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/spy16/slurp/builtin"
@@ -85,6 +83,9 @@ func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 	case core.Seq:
 		return a.analyzeSeq(env, f)
 
+	case core.Fn:
+		return FnExpr{Fn: f}, nil
+
 	}
 
 	return ConstExpr{form}, nil
@@ -130,38 +131,24 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 
 	// The call target is not a special form.  It is some kind of invokation.
 	// Unpack arguments.
-	args, err := a.unpackArgs(env, seq)
+	as, err := a.unpackArgs(env, seq)
 	if err != nil {
 		return nil, err
 	}
 
 	// Analyze arguments.
-	as := make([]core.Expr, len(args))
-	for i, arg := range args {
-		if as[i], err = a.analyze(env, arg); err != nil {
+	args := make([]core.Expr, len(as))
+	for i, arg := range as {
+		if args[i], err = a.analyze(env, arg); err != nil {
 			return nil, err
 		}
 	}
 
-	// Determine whether this is an invokation on a Fn or an invokable
-	// value, and return the appropriate expression.
-	switch t := target.(type) {
-	case core.Fn:
-		return CallExpr{
-			Fn:       t,
-			Analyzer: a,
-			Args:     as,
-		}, nil
-
-	case core.Invokable:
-		return InvokeExpr{
-			Target: t,
-			Args:   as,
-		}, nil
-
-	}
-
-	return nil, fmt.Errorf("%w '%s'", core.ErrNotInvokable, reflect.TypeOf(target))
+	// Call target is not a special form and must be a Invokable. Analyze
+	// the arguments and create an InvokeExpr.
+	iex := InvokeExpr{Args: args}
+	iex.Target, err = a.analyze(env, target)
+	return iex, err
 }
 
 func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, err error) {
@@ -288,29 +275,28 @@ func (a analyzer) macroExpand(env core.Env, form ww.Any) (ww.Any, error) {
 		return nil, builtin.ErrNoExpand
 	}
 
-	args, err := seq.Next()
+	// pop head; seq is now args.
+	if seq, err = seq.Next(); err != nil {
+		return nil, err
+	}
+
+	// N.B.:  macro functions receive unevaluated values, so
+	//		  no analyze/eval here.
+	args, err := core.ToSlice(seq)
 	if err != nil {
 		return nil, err
 	}
 
-	as := make([]core.Expr, 0, cnt-1)
-	if err = core.ForEach(args, func(item ww.Any) (bool, error) {
-		arg, err := a.analyze(env, item)
-		as = append(as, arg)
-		return false, err
-	}); err != nil {
+	name, err := fn.Name()
+	if err != nil {
 		return nil, err
 	}
 
-	if v, err = (CallExpr{
-		Fn:       fn,
+	return core.BoundFn{
 		Analyzer: a,
-		Args:     as,
-	}).Eval(env); err != nil {
-		return nil, err
-	}
-
-	return v.(ww.Any), nil
+		Fn:       fn,
+		Env:      env.Child(name, nil),
+	}.Invoke(args)
 }
 
 func resolve(env core.Env, symbol string) (any ww.Any, err error) {

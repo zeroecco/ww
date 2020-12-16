@@ -84,7 +84,7 @@ type funcWrapper struct {
 
 func (fw *funcWrapper) Value() mem.Any { return fw.sym.Value() }
 
-func (fw *funcWrapper) Invoke(args ...ww.Any) (ww.Any, error) {
+func (fw *funcWrapper) Invoke(args []ww.Any) (ww.Any, error) {
 	// allocate argument slice.
 	argCount := len(args)
 	argVals := make([]reflect.Value, argCount, argCount)

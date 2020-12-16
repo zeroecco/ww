@@ -13,14 +13,63 @@ import (
 
 var (
 	errNoMatch = errors.New("does not match")
+
+	_ Invokable = (*BoundFn)(nil)
 )
 
 // A CallTarget is an implementation of a specific call signature for Fn.
 type CallTarget struct {
-	Name     string
-	Param    []string
+	Param    capnp.TextList
+	Body     mem.Any_List
 	Variadic bool
-	Body     []ww.Any
+}
+
+// Call evaluates the body.
+func (t CallTarget) Call(a Analyzer, env Env) (any ww.Any, err error) {
+	var res interface{}
+	for i := 0; i < t.Body.Len(); i++ {
+		if any, err = AsAny(t.Body.At(i)); err != nil {
+			return
+		}
+
+		if any, err = Eval(env, a, any); err != nil {
+			return
+		}
+	}
+
+	if res == nil {
+		return Nil{}, nil
+	}
+
+	return res.(ww.Any), nil
+}
+
+// BoundFn is a function bound to a local env.
+type BoundFn struct {
+	Fn
+	Env      Env
+	Analyzer Analyzer
+}
+
+// Invoke the underlying function.
+func (f BoundFn) Invoke(args []ww.Any) (ww.Any, error) {
+	target, err := f.Fn.Match(len(args))
+	if err != nil {
+		return nil, err
+	}
+
+	var param string
+	for i := 0; i < target.Param.Len(); i++ {
+		if param, err = target.Param.At(i); err != nil {
+			return nil, err
+		}
+
+		if err = f.Env.Bind(param, args[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return target.Call(f.Analyzer, f.Env)
 }
 
 // Fn is a multi-arity function or macro.
@@ -32,15 +81,12 @@ func (fn Fn) Value() mem.Any { return fn.Any }
 // String returns a human-readable representation of the function that
 // is suitable for printing.
 func (fn Fn) String() (string, error) {
-	// TODO:  more detail in rendering.
-	return fn.Name()
+	name, err := fn.Name()
+	if err != nil {
+		return "", err
+	}
 
-	// name, err := fn.Name()
-	// if err != nil {
-	// 	return "", err
-	// }
-
-	// return fmt.Sprintf("func %s(%v)", name, strings.Join(args, ", ")), nil
+	return fmt.Sprintf("Fn{%s}", name), nil
 }
 
 // Macro returns true if the function is a macro.
@@ -67,7 +113,7 @@ func (fn Fn) Name() (string, error) {
 	return raw.Name()
 }
 
-// Match the arguments to the appropriate call signature.
+// Match the arguments to a call target.
 func (fn Fn) Match(nargs int) (CallTarget, error) {
 	raw, err := fn.Fn()
 	if err != nil {
@@ -79,33 +125,38 @@ func (fn Fn) Match(nargs int) (CallTarget, error) {
 		return CallTarget{}, err
 	}
 
-	var ct CallTarget
-	if ct.Name, err = fn.Name(); err != nil {
+	var f mem.Fn_Func
+	for i := 0; i < fs.Len(); i++ {
+		f = fs.At(i)
+
+		// if there are no params -> must have 0 args
+		if !f.HasParams() && nargs == 0 {
+			body, err := f.Body()
+			return CallTarget{Body: body}, err
+		}
+
+		ps, err := f.Params()
+		if err != nil {
+			return CallTarget{}, err
+		}
+
+		nparam := ps.Len()
+		if f.Variadic() && nargs >= nparam-1 {
+			body, err := f.Body()
+			return CallTarget{Body: body, Param: ps, Variadic: true}, err
+		} else if nargs == nparam {
+			body, err := f.Body()
+			return CallTarget{Body: body, Param: ps}, err
+		}
+	}
+
+	// Did not find suitable call target.  Return informative error message.
+	name, err := fn.Name()
+	if err != nil {
 		return CallTarget{}, err
 	}
 
-	var a funcAnalyzer
-	for i := 0; i < fs.Len(); i++ {
-		a.f = fs.At(i)
-		if ok, err := a.matchArity(nargs); err != nil {
-			return CallTarget{}, err
-		} else if !ok {
-			continue
-		}
-
-		if ct.Param, err = a.params(); err != nil {
-			return CallTarget{}, err
-		}
-
-		if ct.Body, err = a.body(); err != nil {
-			return CallTarget{}, err
-		}
-
-		ct.Variadic = a.variadic()
-		return ct, nil
-	}
-
-	return CallTarget{}, fmt.Errorf("%w (%d) to '%s'", ErrArity, nargs, ct.Name)
+	return CallTarget{}, fmt.Errorf("%w (%d) to '%s'", ErrArity, nargs, name)
 }
 
 // FuncBuilder is a factory type for Fn.
@@ -316,58 +367,4 @@ func (sig callSignature) populateBody(f mem.Fn_Func) error {
 	}
 
 	return err
-}
-
-type funcAnalyzer struct {
-	f      mem.Fn_Func
-	ps     capnp.TextList
-	nparam int
-}
-
-func (a *funcAnalyzer) matchArity(nargs int) (bool, error) {
-	// if there are no params -> must have 0 args
-	if !a.f.HasParams() {
-		return nargs == 0, nil
-	}
-
-	var err error
-	if a.ps, err = a.f.Params(); err != nil {
-		return false, err
-	}
-
-	a.nparam = a.ps.Len()
-	if a.variadic() {
-		return nargs >= a.nparam-1, nil
-	}
-
-	return nargs == a.nparam, nil
-}
-
-func (a funcAnalyzer) variadic() bool { return a.f.Variadic() }
-
-func (a funcAnalyzer) params() (ps []string, err error) {
-	ps = make([]string, a.nparam)
-	for i := range ps {
-		if ps[i], err = a.ps.At(i); err != nil {
-			break
-		}
-	}
-
-	return
-}
-
-func (a funcAnalyzer) body() (forms []ww.Any, err error) {
-	var vs mem.Any_List
-	if vs, err = a.f.Body(); err != nil {
-		return
-	}
-
-	forms = make([]ww.Any, vs.Len())
-	for i := range forms {
-		if forms[i], err = AsAny(vs.At(i)); err != nil {
-			break
-		}
-	}
-
-	return
 }
