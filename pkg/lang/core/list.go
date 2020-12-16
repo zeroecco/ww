@@ -15,6 +15,7 @@ var (
 
 	emptyList mem.Any
 
+	_ List = (*EmptyPersistentList)(nil)
 	_ List = (*DeepPersistentList)(nil)
 	_ List = (*EmptyPersistentList)(nil)
 )
@@ -22,6 +23,10 @@ var (
 func init() {
 	var err error
 	if emptyList, err = memutil.Alloc(capnp.SingleSegment(nil)); err != nil {
+		panic(err)
+	}
+
+	if _, err = emptyList.NewList(); err != nil {
 		panic(err)
 	}
 }
