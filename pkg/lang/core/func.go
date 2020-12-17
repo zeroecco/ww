@@ -31,7 +31,7 @@ func (t CallTarget) Call(a Analyzer, env Env) (any ww.Any, err error) {
 			return
 		}
 
-		if any, err = Eval(env, a, any); err != nil {
+		if any, err = Eval(a, env, any); err != nil {
 			return
 		}
 	}

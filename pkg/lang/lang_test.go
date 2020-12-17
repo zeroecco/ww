@@ -46,8 +46,13 @@ func TestLang(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	vm, err := lang.New(mock_ww.NewMockAnchor(ctrl))
-	require.NoError(t, err)
+	root := mock_ww.NewMockAnchor(ctrl)
+	vm := lang.VM{
+		Analyzer: &lang.Analyzer{Root: root},
+		Env:      lang.NewEnv(),
+	}
+
+	require.NoError(t, vm.Init())
 
 	forms, err := reader.New(strings.NewReader(src)).All()
 	require.NoError(t, err)

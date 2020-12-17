@@ -3,13 +3,10 @@ package lang
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
 
-	"github.com/spy16/slurp/builtin"
-	score "github.com/spy16/slurp/core"
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 	"github.com/wetware/ww/pkg/lang/reader"
@@ -30,24 +27,19 @@ var (
 	// _ core.Expr = (*)(nil)
 )
 
-type (
-	// QuoteExpr expression represents a quoted form
-	QuoteExpr = builtin.QuoteExpr
-)
-
 // ConstExpr returns the Const value wrapped inside when evaluated. It has
 // no side-effect on the VM.
 type ConstExpr struct{ Form ww.Any }
 
 // Eval returns the constant value unmodified.
-func (ce ConstExpr) Eval(_ core.Env) (score.Any, error) { return ce.Form, nil }
+func (ce ConstExpr) Eval(_ core.Env) (ww.Any, error) { return ce.Form, nil }
 
 // DoExpr represents the (do expr*) form.
 type DoExpr struct{ Exprs []core.Expr }
 
 // Eval evaluates each expr in the do form in the order and returns the
 // result of the last eval.
-func (de DoExpr) Eval(env core.Env) (res score.Any, err error) {
+func (de DoExpr) Eval(env core.Env) (res ww.Any, err error) {
 	for _, expr := range de.Exprs {
 		if res, err = expr.Eval(env); err != nil {
 			return
@@ -66,7 +58,7 @@ type IfExpr struct{ Test, Then, Else core.Expr }
 
 // Eval evaluates the then or else expr based on truthiness of the test
 // expr result.
-func (ife IfExpr) Eval(env core.Env) (score.Any, error) {
+func (ife IfExpr) Eval(env core.Env) (ww.Any, error) {
 	target := ife.Else
 	if ife.Test != nil {
 		test, err := ife.Test.Eval(env)
@@ -74,7 +66,7 @@ func (ife IfExpr) Eval(env core.Env) (score.Any, error) {
 			return nil, err
 		}
 
-		ok, err := core.IsTruthy(test.(ww.Any))
+		ok, err := core.IsTruthy(test)
 		if err != nil {
 			return nil, err
 		}
@@ -96,14 +88,14 @@ type ResolveExpr struct{ Symbol core.Symbol }
 // Eval resolves the symbol in the given environment or its parent env
 // and returns the result. Returns ErrNotFound if the symbol was not
 // found in the entire hierarchy.
-func (re ResolveExpr) Eval(env core.Env) (v score.Any, err error) {
+func (re ResolveExpr) Eval(env core.Env) (v ww.Any, err error) {
 	var sym string
 	if sym, err = re.Symbol.Symbol(); err != nil {
 		return
 	}
 
 	for env != nil {
-		if v, err = env.Resolve(sym); errors.Is(err, core.ErrNotFound) {
+		if v, err = env.Resolve(sym); err == core.ErrNotFound {
 			// not found in the current frame. check parent.
 			env = env.Parent()
 			continue
@@ -111,6 +103,10 @@ func (re ResolveExpr) Eval(env core.Env) (v score.Any, err error) {
 
 		// found the symbol or there was some unexpected error.
 		break
+	}
+
+	if err == core.ErrNotFound {
+		err = fmt.Errorf("%w: %s", core.ErrNotFound, re.Symbol)
 	}
 
 	return
@@ -123,11 +119,11 @@ type DefExpr struct {
 }
 
 // Eval creates the binding with the name and value in Root env.
-func (de DefExpr) Eval(env core.Env) (score.Any, error) {
-	var val score.Any
+func (dx DefExpr) Eval(env core.Env) (ww.Any, error) {
+	var val ww.Any
 	var err error
-	if de.Value != nil {
-		val, err = de.Value.Eval(env)
+	if dx.Value != nil {
+		val, err = dx.Value.Eval(env)
 		if err != nil {
 			return nil, err
 		}
@@ -135,11 +131,11 @@ func (de DefExpr) Eval(env core.Env) (score.Any, error) {
 		val = core.Nil{}
 	}
 
-	if err := score.Root(env).Bind(de.Name, val); err != nil {
+	if err := env.Root().Bind(dx.Name, val); err != nil {
 		return nil, err
 	}
 
-	return core.NewSymbol(capnp.SingleSegment(nil), de.Name)
+	return core.NewSymbol(capnp.SingleSegment(nil), dx.Name)
 }
 
 // FnExpr binds an env to a call target.
@@ -149,7 +145,7 @@ type FnExpr struct {
 }
 
 // Eval binds the environment to a call target
-func (fex FnExpr) Eval(env core.Env) (score.Any, error) {
+func (fex FnExpr) Eval(env core.Env) (ww.Any, error) {
 	name, err := fex.Fn.Name()
 	return core.BoundFn{
 		Analyzer: fex.Analyzer,
@@ -166,7 +162,7 @@ type InvokeExpr struct {
 
 // Eval evaluates the target expr and invokes the result if it is an
 // Invokable  Returns error otherwise.
-func (ie InvokeExpr) Eval(env core.Env) (any score.Any, err error) {
+func (ie InvokeExpr) Eval(env core.Env) (any ww.Any, err error) {
 	if any, err = ie.Target.Eval(env); err != nil {
 		return
 	}
@@ -183,7 +179,7 @@ func (ie InvokeExpr) Eval(env core.Env) (any score.Any, err error) {
 			return
 		}
 
-		args[i] = any.(ww.Any)
+		args[i] = any
 	}
 
 	return fn.Invoke(args)
@@ -197,7 +193,7 @@ type PathExpr struct {
 
 // Eval walks the specified path, starting from the root anchor,
 // and binds the result to the path.
-func (pex PathExpr) Eval(core.Env) (score.Any, error) {
+func (pex PathExpr) Eval(core.Env) (ww.Any, error) {
 	parts, err := pex.Path.Parts()
 	if err != nil {
 		return nil, err
@@ -217,7 +213,7 @@ type VectorExpr struct {
 
 // Eval returns a new vector whose contents are the evaluated values
 // of the objects contained by the evaluated vector. Elements are evaluated left to right
-func (vex VectorExpr) Eval(env core.Env) (score.Any, error) {
+func (vex VectorExpr) Eval(env core.Env) (ww.Any, error) {
 	cnt, err := vex.Vector.Count()
 	if err != nil || cnt == 0 {
 		return vex.Vector, err
@@ -256,7 +252,7 @@ type ImportExpr struct {
 }
 
 // Eval loads the module files from the supplied paths
-func (lex ImportExpr) Eval(env core.Env) (any score.Any, err error) {
+func (lex ImportExpr) Eval(env core.Env) (any ww.Any, err error) {
 	var dex DoExpr
 	for _, path := range lex.Paths {
 		if dex.Exprs, err = lex.loadOne(env, path); err != nil {

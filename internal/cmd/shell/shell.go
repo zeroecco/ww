@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
@@ -14,23 +15,22 @@ import (
 	"time"
 
 	"github.com/chzyer/readline"
-	"github.com/spy16/slurp/repl"
 	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 
-	clientutil "github.com/wetware/ww/internal/util/client"
-	ctxutil "github.com/wetware/ww/internal/util/ctx"
-	logutil "github.com/wetware/ww/internal/util/log"
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang"
 	"github.com/wetware/ww/pkg/lang/core"
-	"github.com/wetware/ww/pkg/lang/reader"
 )
 
-const bannerTemplate = `Wetware v{{.App.Version}}
+const (
+	wwpath         = "WW_PATH"
+	defaultPath    = "~/.ww"
+	bannerTemplate = `Wetware v{{.App.Version}}
 Copyright {{.App.Copyright}}
 Compiled with {{.GoVersion}} for {{.GOOS}}
 `
+)
 
 var (
 	flags = []cli.Flag{
@@ -47,6 +47,16 @@ var (
 			Value:   "/mdns",
 			EnvVars: []string{"WW_DISCOVER"},
 		},
+		&cli.BoolFlag{
+			Name:    "dial",
+			Usage:   "dial into a cluster using -join and -discover",
+			EnvVars: []string{"WW_AUTODIAL"},
+		},
+		&cli.DurationFlag{
+			Name:  "timeout",
+			Usage: "timeout for -dial",
+			Value: time.Second * 10,
+		},
 		&cli.StringFlag{
 			Name:    "namespace",
 			Aliases: []string{"ns"},
@@ -60,23 +70,18 @@ var (
 			Usage:   "suppress banner message on interactive startup",
 			EnvVars: []string{"WW_QUIET"},
 		},
-		&cli.BoolFlag{
-			Name:    "dial",
-			Usage:   "dial into a cluster using -join and -discover",
-			EnvVars: []string{"WW_AUTODIAL"},
-		},
-		&cli.DurationFlag{
-			Name:  "timeout",
-			Usage: "timeout for -dial",
-			Value: time.Second * 10,
-		},
 		&cli.StringSliceFlag{
-			Name:    "path",
-			Usage:   "location of ww source files",
-			Value:   cli.NewStringSlice("~/.ww"),
-			EnvVars: []string{"WW_PATH"},
+			Name:        "path",
+			Usage:       "location of ww source files",
+			DefaultText: defaultPath,
+			EnvVars:     []string{wwpath},
 		},
-
+		&cli.PathFlag{
+			Name:    "appdata",
+			Usage:   "local data directory",
+			Value:   defaultPath,
+			EnvVars: []string{"WW_APPDATA"},
+		},
 		// debug flags (hidden)
 		&cli.BoolFlag{
 			Name:   "log-fx",
@@ -98,117 +103,151 @@ func Command() *cli.Command {
 
 func run() cli.ActionFunc {
 	return func(c *cli.Context) error {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		app := fx.New(fxLogger(c),
+		app := fx.New(
+			fxLogger(c),
+			fx.StartTimeout(c.Duration("timeout")),
 			fx.Supply(c,
-				prompt{Standard: "ww »", Multiline: "   ›"}),
+				fx.Annotated{Name: "prompt", Target: " »"},
+				fx.Annotated{Name: "multiline", Target: " ›"}),
 			fx.Provide(
-				newPaths,
+				newVM,
+				newREPL,
 				newInput,
-				newBanner,
-				newWriter,
 				newPrinter,
-				logutil.New,
-				newEvaluator,
-				newRootAnchor,
-				newReaderFactory),
-			fx.Invoke(loop))
+				newPathData,
+				newAnchorProvider),
+			fx.Invoke(
+				banner,
+				loop))
 
-		if err := app.Start(ctx); err != nil {
-			return err
-		}
-
-		return app.Stop(ctx)
+		return app.Err()
 	}
 }
 
-func loop(f replFactory) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func banner(c *cli.Context) error {
+	if c.Bool("quiet") {
+		return nil
+	}
 
-	return f.New().Loop(ctx)
+	t, err := template.New("banner").Parse(bannerTemplate)
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, struct {
+		*cli.Context
+		GoVersion, GOOS string
+	}{
+		Context:   c,
+		GoVersion: runtime.Version(),
+		GOOS:      runtime.GOOS,
+	}); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(c.App.Writer, buf.String())
+	return err
 }
 
-type replFactory struct {
+type promptConfig struct {
 	fx.In
 
-	Eval      repl.Evaluator
-	Banner    string `name:"banner"`
 	Prompt    string `name:"prompt"`
 	Multiline string `name:"multiline"`
-	Stdout    io.Writer
-	NewReader repl.ReaderFactory
-	Input     repl.Input
-	Printer   repl.Printer
 }
 
-func (f replFactory) New() *repl.REPL {
-	return repl.New(f.Eval,
-		repl.WithBanner(f.Banner),
-		repl.WithReaderFactory(f.NewReader),
-		repl.WithPrompts(f.Prompt, f.Multiline),
-		repl.WithInput(f.Input, nil),
-		repl.WithOutput(f.Stdout),
-		repl.WithPrinter(f.Printer),
-	)
-}
+func loop(repl *REPL, p promptConfig) error {
+	repl.CurrentNS = "ww" // TODO
 
-func newPaths(c *cli.Context, log ww.Logger) ([]string, error) {
-	paths := c.StringSlice("path")
-	log.WithField("paths", paths).Debug("resolving source paths")
-
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-
-	ps := make([]string, len(paths))
-	for i, p := range paths {
-		if p[0] == '~' {
-			p = strings.Replace(p, "~", usr.HomeDir, 1)
+	for repl.Init(); repl.More(); repl.Next() {
+		ns := repl.CurrentNS
+		line := p.Prompt
+		if repl.LineNo > 1 {
+			ns = strings.Repeat(" ", len(ns)+1)
+			line = p.Multiline
 		}
 
-		ps[i] = filepath.Clean(p)
+		repl.SetPrompt(fmt.Sprintf("%s%s ", ns, line))
 	}
 
-	return ps, nil
+	return repl.Err()
 }
 
-func newRootAnchor(c *cli.Context, lx fx.Lifecycle) (ww.Anchor, error) {
-	if !c.Bool("dial") {
-		return nopAnchor{}, nil
+func newVM(root AnchorProvider, src lang.PathProvider) lang.VM {
+	return lang.VM{
+		Env: lang.NewEnv(),
+		Analyzer: &lang.Analyzer{
+			Root: root.Anchor(),
+			Src:  src,
+		},
+	}
+}
 
+type staticPathResolver struct {
+	usr   *user.User
+	paths []string
+}
+
+func (s staticPathResolver) Paths() lang.PathSet {
+	ps := make(lang.PathSet, len(s.paths))
+	for i, p := range s.paths {
+		if p[0] == '~' {
+			p = expandHomeDir(s.usr, p)
+		}
+
+		ps[i] = p
 	}
 
-	ctx := ctxutil.WithDefaultSignals(context.Background())
-	ctx, cancel := context.WithTimeout(ctx, c.Duration("timeout"))
-	defer cancel()
+	return ps
+}
 
-	root, err := clientutil.Dial(ctx, c)
-	if err == nil {
-		lx.Append(closehook(root))
+func expandHomeDir(usr *user.User, path string) string {
+	return filepath.Clean(strings.Replace(path, "~", usr.HomeDir, 1))
+}
+
+type dynamicPathResolver struct{ usr *user.User }
+
+func (d dynamicPathResolver) Paths() lang.PathSet {
+	if paths := filepath.SplitList(os.Getenv(wwpath)); len(paths) != 0 {
+		return staticPathResolver{usr: d.usr, paths: paths}.Paths()
 	}
 
-	return root, err
+	return staticPathResolver{usr: d.usr, paths: []string{defaultPath}}.Paths()
 }
 
-func newReaderFactory() repl.ReaderFactory {
-	return repl.ReaderFactoryFunc(reader.New)
+type pathData struct {
+	fx.Out
+
+	User         *user.User
+	PathProvider lang.PathProvider
 }
 
-func newWriter(c *cli.Context) io.Writer { return c.App.Writer }
+func newPathData(c *cli.Context) (p pathData, err error) {
+	if p.User, err = user.Current(); err != nil {
+		return
+	}
 
-func newPrinter() repl.Printer { return printer{} }
+	p.PathProvider = dynamicPathResolver{p.User}
+	if paths := c.StringSlice("path"); paths != nil {
+		p.PathProvider = staticPathResolver{
+			usr:   p.User,
+			paths: c.StringSlice("path"),
+		}
+	}
 
-func newEvaluator(root ww.Anchor, paths []string) (repl.Evaluator, error) {
-	return lang.New(root, paths...)
+	return
 }
 
-func newInput(c *cli.Context, lx fx.Lifecycle) (repl.Input, error) {
+func newInput(c *cli.Context, usr *user.User, lx fx.Lifecycle) (*readline.Instance, error) {
+	appdir := c.Path("appdata")
+	if appdir[0] == '~' {
+		appdir = expandHomeDir(usr, appdir)
+	}
+
 	r, err := readline.NewEx(&readline.Config{
-		HistoryFile: "/tmp/ww.tmp", // TODO(enhancement): ~/.ww/history.ww
+		HistoryFile: filepath.Join(appdir, "__history__.ww"),
+		Stdin:       c.App.Reader.(io.ReadCloser),
 		Stdout:      c.App.Writer,
 		Stderr:      c.App.ErrWriter,
 
@@ -226,85 +265,29 @@ func newInput(c *cli.Context, lx fx.Lifecycle) (repl.Input, error) {
 		lx.Append(closehook(r))
 	}
 
-	return linereader{r}, err
+	return r, err
 }
 
-type linereader struct{ *readline.Instance }
+type printer struct{ Stdout, Stderr io.Writer }
 
-func (l linereader) Readline() (line string, err error) {
-	for {
-		switch line, err = l.Instance.Readline(); err {
-		case nil:
-		case readline.ErrInterrupt:
-			line, err = "", nil
-			fallthrough
-		default:
-			l.Clean()
-		}
-
-		return
+func newPrinter(c *cli.Context) Printer {
+	return printer{
+		Stdout: c.App.Writer,
+		Stderr: c.App.ErrWriter,
 	}
 }
 
-type prompt struct {
-	fx.Out
-
-	Standard  string `name:"prompt"`
-	Multiline string `name:"multiline"`
+func (p printer) Print(any ww.Any) error {
+	s, err := core.Render(any)
+	if err == nil {
+		_, err = fmt.Fprintln(p.Stdout, s)
+	}
+	return err
 }
 
-type printer struct{}
-
-func (printer) Fprintln(w io.Writer, val interface{}) (err error) {
-	switch v := val.(type) {
-	case nil:
-	case error:
-		_, err = fmt.Fprintf(w, "ERROR: %v\n", v)
-	case ww.Any:
-		s, err := core.Render(v)
-		if err != nil {
-			return err
-		}
-
-		_, err = fmt.Fprintln(w, s)
-	}
-
-	return
-}
-
-func (printer) analyze(val interface{}) (interface{}, error) {
-	if any, ok := val.(ww.Any); ok {
-		return core.Render(any)
-	}
-
-	return val, nil
-}
-
-type banner struct {
-	fx.Out
-
-	Banner string `name:"banner"`
-}
-
-func newBanner(c *cli.Context) (b banner, err error) {
-	if c.Bool("quiet") {
-		return
-	}
-
-	var buf bytes.Buffer
-	templ := template.Must(template.New("banner").Parse(bannerTemplate))
-	if err = templ.Execute(&buf, struct {
-		*cli.Context
-		GoVersion, GOOS string
-	}{
-		Context:   c,
-		GoVersion: runtime.Version(),
-		GOOS:      runtime.GOOS,
-	}); err == nil {
-		b.Banner = buf.String()
-	}
-
-	return
+func (p printer) PrintErr(err error) error {
+	_, err = fmt.Fprintf(p.Stderr, "ERROR: %v\n", err)
+	return err
 }
 
 func fxLogger(c *cli.Context) fx.Option {

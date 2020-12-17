@@ -12,24 +12,6 @@ import (
 	capnp "zombiezen.com/go/capnproto2"
 )
 
-func loadBuiltins(env core.Env, a core.Analyzer) error {
-	return bindAll(env,
-		text("__version__", ww.Version),
-		text("__author__", "Louis Thibault"),
-		text("__copyright__", "2020, Louis Thibault\nAll rights reserved."),
-
-		anchor(),
-		comparison(),
-		container(),
-		function("error", "__error__", core.Raise),
-		function("nil?", "__isnil__", core.IsNil),
-		function("type", "__type__", fnTypeOf),
-		function("not", "__not__", fnNot),
-		function("read", "__read__", fnRead),
-		function("render", "__render__", core.Render),
-		function("print", "__print__", fnPrint))
-}
-
 // comparison operators for ordered types, including numericals.
 func comparison() bindFunc {
 	return func(env core.Env) error {

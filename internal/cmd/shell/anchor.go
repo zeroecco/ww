@@ -4,9 +4,46 @@ import (
 	"context"
 	"errors"
 
+	"github.com/urfave/cli/v2"
+	clientutil "github.com/wetware/ww/internal/util/client"
 	ww "github.com/wetware/ww/pkg"
+	"github.com/wetware/ww/pkg/client"
 	anchorpath "github.com/wetware/ww/pkg/util/anchor/path"
+	"go.uber.org/fx"
 )
+
+// AnchorProvider wraps the root anchor, allowing fx to
+// provide it as a dependency before dialing into the cluster.
+type AnchorProvider interface {
+	Anchor() ww.Anchor
+}
+
+func newAnchorProvider(c *cli.Context, lx fx.Lifecycle) AnchorProvider {
+	if !c.Bool("dial") {
+		return nopAnchorProvider{}
+	}
+
+	var p clientProvider
+	lx.Append(fx.Hook{
+		OnStart: func(ctx context.Context) (err error) {
+			p.c, err = clientutil.Dial(ctx, c)
+			return
+		},
+		OnStop: func(c context.Context) error {
+			return p.c.Close()
+		},
+	})
+
+	return &p
+}
+
+type clientProvider struct{ c client.Client }
+
+func (p clientProvider) Anchor() ww.Anchor { return p.c }
+
+type nopAnchorProvider struct{}
+
+func (nopAnchorProvider) Anchor() ww.Anchor { return nopAnchor{} }
 
 type nopAnchor []string
 

@@ -4,69 +4,55 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
 
-	"github.com/spy16/slurp/core"
 	"github.com/wetware/ww/internal/mem"
 	ww "github.com/wetware/ww/pkg"
 	capnp "zombiezen.com/go/capnproto2"
 )
 
-var (
-	// ErrIncomparableTypes is returned if two types cannot be meaningfully
-	// compared to each other.
-	ErrIncomparableTypes = errors.New("incomparable types")
+// Env represents the environment in which forms are evaluated.
+type Env interface {
+	// Name returns the name of this env frame.
+	Name() string
 
-	// ErrIndexOutOfBounds is returned when a sequence's index is out of range.
-	ErrIndexOutOfBounds = errors.New("index out of bounds")
+	// Root environment of the Env.  If the env is the root end,
+	// it returns itself.
+	Root() Env
 
-	// ErrNotFound is returned by Env when a the corresponding entity for a name,
-	// binding or module path is not found.
-	ErrNotFound = core.ErrNotFound
+	// Parent returns the parent/outer env of the env. Returns nil
+	// if this env is the root.
+	Parent() Env
 
-	// ErrArity is returned when an Invokable is invoked with wrong number
-	// of arguments.
-	ErrArity = core.ErrArity
+	// Bind creates a local binding with given name and value.
+	Bind(name string, val ww.Any) error
 
-	// ErrNotInvokable is returned by InvokeExpr when the target is not invokable.
-	ErrNotInvokable = errors.New("non-invokable type")
+	// Resolve resolves the symbol in this env and return its value
+	// if found. Returns ErrNotFound if name is not found in this
+	// env frame.
+	Resolve(name string) (ww.Any, error)
 
-	// ErrIllegalState is returned when an operation is attempted against a datatype
-	// that has the right type but an inappropriate value.
-	ErrIllegalState = errors.New("illegal state")
+	// Child returns a new env with given frame name and vars bound.
+	// Returned env will have this env as parent/outer.
+	Child(name string, vars map[string]ww.Any) Env
+}
 
-	// ErrMemory is returned when an operation is attempted against an illegally
-	// formatted datatype.
-	ErrMemory = errors.New("memory error")
-
-	errType = reflect.TypeOf((*error)(nil)).Elem()
-	anyType = reflect.TypeOf((*ww.Any)(nil)).Elem()
-)
-
-type (
-	// Env represents the environment in which forms are evaluated.
-	Env = core.Env
-
-	// Expr represents an expression that can be evaluated against an env.
-	Expr = core.Expr
-
-	// Error is returned by all slurp operations. Cause indicates the underlying
-	// error type. Use errors.Is() with Cause to check for specific errors.
-	Error = core.Error
-)
-
-// New returns a root Env that can be used to execute forms.
-// It binds the prelude to the environment before returning.
-func New() Env { return core.New(nil) }
-
-// Analyzer implementation is responsible for performing syntax analysis
+// Analyzer implementation is responsible for syntactical analysis
 // on given form.
 type Analyzer interface {
-	core.Analyzer
+	// Analyze the form's syntax and output an expression that
+	// which can be valuated against an environment.
+	Analyze(env Env, form ww.Any) (Expr, error)
+}
+
+// Expr represents an expression that can be evaluated against an env.
+type Expr interface {
+	// Eval executes the expr against the env and returns the results.
+	// It can have side-effects on env. (e.g., DefExpr).
+	Eval(env Env) (ww.Any, error)
 }
 
 // Eval a form.
-func Eval(env Env, a Analyzer, form ww.Any) (ww.Any, error) {
+func Eval(a Analyzer, env Env, form ww.Any) (ww.Any, error) {
 	expr, err := a.Analyze(env, form)
 	if err != nil || expr == nil {
 		return nil, err

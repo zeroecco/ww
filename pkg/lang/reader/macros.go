@@ -8,37 +8,45 @@ import (
 	"strings"
 	"unicode"
 
-	score "github.com/spy16/slurp/core"
-	"github.com/spy16/slurp/reader"
 	capnp "zombiezen.com/go/capnproto2"
 
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 )
 
-var symbols = map[string]score.Any{
-	"nil":   core.Nil{},
-	"false": core.False,
-	"true":  core.True,
+// Macro implementations can be plugged into the Reader to extend, override
+// or customize behavior of the reader.
+type Macro func(rd *Reader, init rune) (ww.Any, error)
+
+// UnmatchedDelimiter implements a reader macro that can be used to capture
+// unmatched delimiters such as closing parenthesis etc.
+func UnmatchedDelimiter() Macro {
+	return func(rd *Reader, initRune rune) (ww.Any, error) {
+		e := rd.annotateErr(ErrUnmatchedDelimiter, rd.Position(), "").(Error)
+		e.Rune = initRune
+		return nil, e
+	}
 }
 
-func readSymbol(rd *reader.Reader, init rune) (score.Any, error) {
-	beginPos := rd.Position()
+func symbolReader(symTable map[string]ww.Any) Macro {
+	return func(rd *Reader, init rune) (ww.Any, error) {
+		beginPos := rd.Position()
 
-	s, err := rd.Token(init)
-	if err != nil {
-		return nil, annotateErr(rd, err, beginPos, s)
+		s, err := rd.Token(init)
+		if err != nil {
+			return nil, rd.annotateErr(err, beginPos, s)
+		}
+
+		if predefVal, found := symTable[s]; found {
+			return predefVal, nil
+		}
+
+		// TODO(performance):  pre-allocate
+		return core.NewSymbol(capnp.SingleSegment(nil), s)
 	}
-
-	if predefVal, found := symbols[s]; found {
-		return predefVal, nil
-	}
-
-	// TODO(performance):  pre-allocate
-	return core.NewSymbol(capnp.SingleSegment(nil), s)
 }
 
-func readString(rd *reader.Reader, init rune) (score.Any, error) {
+func readString(rd *Reader, init rune) (ww.Any, error) {
 	beginPos := rd.Position()
 
 	var b strings.Builder
@@ -46,19 +54,19 @@ func readString(rd *reader.Reader, init rune) (score.Any, error) {
 		r, err := rd.NextRune()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				err = reader.ErrEOF
+				err = ErrEOF
 			}
-			return nil, annotateErr(rd, err, beginPos, string(init)+b.String())
+			return nil, rd.annotateErr(err, beginPos, string(init)+b.String())
 		}
 
 		if r == '\\' {
 			r2, err := rd.NextRune()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
-					err = reader.ErrEOF
+					err = ErrEOF
 				}
 
-				return nil, annotateErr(rd, err, beginPos, string(init)+b.String())
+				return nil, rd.annotateErr(err, beginPos, string(init)+b.String())
 			}
 
 			// TODO: Support for Unicode escape \uNN format.
@@ -80,7 +88,7 @@ func readString(rd *reader.Reader, init rune) (score.Any, error) {
 	return core.NewString(capnp.SingleSegment(nil), b.String())
 }
 
-func readComment(rd *reader.Reader, _ rune) (score.Any, error) {
+func readComment(rd *Reader, _ rune) (ww.Any, error) {
 	for {
 		r, err := rd.NextRune()
 		if err != nil {
@@ -92,15 +100,15 @@ func readComment(rd *reader.Reader, _ rune) (score.Any, error) {
 		}
 	}
 
-	return nil, reader.ErrSkip
+	return nil, ErrSkip
 }
 
-func readKeyword(rd *reader.Reader, init rune) (score.Any, error) {
+func readKeyword(rd *Reader, init rune) (ww.Any, error) {
 	beginPos := rd.Position()
 
 	token, err := rd.Token(-1)
 	if err != nil {
-		return nil, annotateErr(rd, err, beginPos, token)
+		return nil, rd.annotateErr(err, beginPos, token)
 	}
 
 	// TODO(performance):  pre-allocate the arena based on the token length +
@@ -108,12 +116,12 @@ func readKeyword(rd *reader.Reader, init rune) (score.Any, error) {
 	return core.NewKeyword(capnp.SingleSegment(nil), token)
 }
 
-func readCharacter(rd *reader.Reader, _ rune) (score.Any, error) {
+func readCharacter(rd *Reader, _ rune) (ww.Any, error) {
 	beginPos := rd.Position()
 
 	r, err := rd.NextRune()
 	if err != nil {
-		return nil, annotateErr(rd, err, beginPos, "")
+		return nil, rd.annotateErr(err, beginPos, "")
 	}
 
 	token, err := rd.Token(r)
@@ -140,55 +148,55 @@ func readCharacter(rd *reader.Reader, _ rune) (score.Any, error) {
 	return nil, fmt.Errorf("unsupported character: '\\%s'", token)
 }
 
-func readList(rd *reader.Reader, _ rune) (score.Any, error) {
+func readList(rd *Reader, _ rune) (ww.Any, error) {
 	const listEnd = ')'
 
 	beginPos := rd.Position()
 
 	forms := make([]ww.Any, 0, 32) // pre-allocate to improve performance on small lists
-	if err := rd.Container(listEnd, "list", func(val score.Any) error {
-		forms = append(forms, val.(ww.Any))
+	if err := rd.Container(listEnd, "list", func(val ww.Any) error {
+		forms = append(forms, val)
 		return nil
 	}); err != nil {
-		return nil, annotateErr(rd, err, beginPos, "")
+		return nil, rd.annotateErr(err, beginPos, "")
 	}
 
 	// TODO(performance):  can we pre-allocate here?
 	return core.NewList(capnp.SingleSegment(nil), forms...)
 }
 
-func readVector(rd *reader.Reader, _ rune) (score.Any, error) {
+func readVector(rd *Reader, _ rune) (ww.Any, error) {
 	const vecEnd = ']'
 
 	beginPos := rd.Position()
 
 	var vec core.Container = core.EmptyVector
-	if err := rd.Container(vecEnd, "vector", func(val score.Any) (err error) {
-		vec, err = vec.Conj(val.(ww.Any))
+	if err := rd.Container(vecEnd, "vector", func(val ww.Any) (err error) {
+		vec, err = vec.Conj(val)
 		return
 	}); err != nil {
-		return nil, annotateErr(rd, err, beginPos, "")
+		return nil, rd.annotateErr(err, beginPos, "")
 	}
 
 	return vec, nil
 }
 
-func quoteFormReader(expandFunc string) reader.Macro {
+func quoteFormReader(expandFunc string) Macro {
 	sym, err := core.NewSymbol(capnp.SingleSegment(nil), expandFunc)
 	if err != nil {
 		panic(err)
 	}
 
-	return func(rd *reader.Reader, _ rune) (score.Any, error) {
+	return func(rd *Reader, _ rune) (ww.Any, error) {
 		expr, err := rd.One()
 		if err != nil {
 			if err == io.EOF {
-				return nil, reader.Error{
+				return nil, Error{
 					Form:  expandFunc,
-					Cause: reader.ErrEOF,
+					Cause: ErrEOF,
 				}
-			} else if err == reader.ErrSkip {
-				return nil, reader.Error{
+			} else if err == ErrSkip {
+				return nil, Error{
 					Form:  expandFunc,
 					Cause: errors.New("cannot quote a no-op form"),
 				}
@@ -196,11 +204,11 @@ func quoteFormReader(expandFunc string) reader.Macro {
 			return nil, err
 		}
 
-		return core.NewList(capnp.SingleSegment(nil), sym, expr.(ww.Any))
+		return core.NewList(capnp.SingleSegment(nil), sym, expr)
 	}
 }
 
-func readPath(rd *reader.Reader, char rune) (_ score.Any, err error) {
+func readPath(rd *Reader, char rune) (_ ww.Any, err error) {
 	var b strings.Builder
 	for {
 		b.WriteRune(char)

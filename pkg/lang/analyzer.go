@@ -3,61 +3,68 @@ package lang
 import (
 	"errors"
 	"strings"
+	"sync"
 
-	"github.com/spy16/slurp/builtin"
-	score "github.com/spy16/slurp/core"
 	"github.com/wetware/ww/internal/mem"
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 )
 
-var _ core.Analyzer = (*analyzer)(nil)
+var _ core.Analyzer = (*Analyzer)(nil)
+
+// ErrNoExpand is returned during macro-expansion to indicate the form
+// was not expanded.
+var ErrNoExpand = errors.New("no macro expansion")
 
 // SpecialParser defines a special form.
 type SpecialParser func(core.Analyzer, core.Env, core.Seq) (core.Expr, error)
 
-type analyzer struct {
-	root    ww.Anchor
+// PathProvider returns a set of paths from which wetware source code
+// can be loaded.
+type PathProvider interface {
+	Paths() PathSet
+}
+
+// PathSet is a collection of source directories.
+type PathSet []string
+
+// Analyzer for wetware syntax
+type Analyzer struct {
+	Root ww.Anchor
+	Src  PathProvider
+
+	init    sync.Once
 	special map[string]SpecialParser
 }
 
-func newAnalyzer(root ww.Anchor, paths []string) (core.Analyzer, error) {
-	if root == nil {
-		return nil, errors.New("nil anchor")
-	}
+// Analyze performs syntactic analysis of given form and returns an Expr
+// that can be evaluated for result against an Env.
+func (a *Analyzer) Analyze(env core.Env, any ww.Any) (core.Expr, error) {
+	a.init.Do(func() {
+		if a.Src == nil {
+			a.Src = noSrc{}
+		}
 
-	return analyzer{
-		root: root,
-		special: map[string]SpecialParser{
+		a.special = map[string]SpecialParser{
 			"do":    parseDo,
 			"if":    parseIf,
 			"def":   parseDef,
 			"fn":    parseFn,
 			"macro": parseMacro,
 			"quote": parseQuote,
-			// "go": c.Go,
+			// "go": goParser(a.Root),
 			"eval":   parseEval,
-			"import": importer(paths).Parse,
-		},
-	}, nil
-}
+			"import": importParser(a.Src),
+		}
+	})
 
-// Analyze performs syntactic analysis of given form and returns an Expr
-// that can be evaluated for result against an Env.
-func (a analyzer) Analyze(env core.Env, rawForm score.Any) (core.Expr, error) {
-	return a.analyze(env, rawForm.(ww.Any))
-}
-
-// analyze allows private methods of `analyzer` to by pass the initial
-// type assertion for `ww.Any`.
-func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 	if core.IsNil(any) {
-		return builtin.ConstExpr{Const: core.Nil{}}, nil
+		return ConstExpr{Form: core.Nil{}}, nil
 	}
 
 	form, err := a.macroExpand(env, any)
 	if err != nil {
-		if !errors.Is(err, builtin.ErrNoExpand) {
+		if !errors.Is(err, ErrNoExpand) {
 			return nil, err
 		}
 
@@ -70,7 +77,7 @@ func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 
 	case core.UnboundPath:
 		return PathExpr{
-			Root: a.root,
+			Root: a.Root,
 			Path: f,
 		}, nil
 
@@ -91,7 +98,7 @@ func (a analyzer) analyze(env core.Env, any ww.Any) (core.Expr, error) {
 	return ConstExpr{form}, nil
 }
 
-func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
+func (a *Analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 	// Return an empty sequence unmodified.
 	cnt, err := seq.Count()
 	if err != nil || cnt == 0 {
@@ -139,7 +146,7 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 	// Analyze arguments.
 	args := make([]core.Expr, len(as))
 	for i, arg := range as {
-		if args[i], err = a.analyze(env, arg); err != nil {
+		if args[i], err = a.Analyze(env, arg); err != nil {
 			return nil, err
 		}
 	}
@@ -147,11 +154,11 @@ func (a analyzer) analyzeSeq(env core.Env, seq core.Seq) (core.Expr, error) {
 	// Call target is not a special form and must be a Invokable. Analyze
 	// the arguments and create an InvokeExpr.
 	iex := InvokeExpr{Args: args}
-	iex.Target, err = a.analyze(env, target)
+	iex.Target, err = a.Analyze(env, target)
 	return iex, err
 }
 
-func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, err error) {
+func (a *Analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, err error) {
 	if seq == nil {
 		return
 	}
@@ -228,24 +235,20 @@ func (a analyzer) unpackArgs(env core.Env, seq core.Seq) (args []ww.Any, err err
 	return
 }
 
-func (a analyzer) Eval(env core.Env, any ww.Any) (ww.Any, error) {
-	expr, err := a.analyze(env, any)
+// Eval a form against the supplied environment.
+func (a *Analyzer) Eval(env core.Env, form ww.Any) (ww.Any, error) {
+	expr, err := a.Analyze(env, form)
 	if err != nil {
 		return nil, err
 	}
 
-	v, err := expr.Eval(env)
-	if err == nil {
-		any = v.(ww.Any)
-	}
-
-	return any, err
+	return expr.Eval(env)
 }
 
-func (a analyzer) macroExpand(env core.Env, form ww.Any) (ww.Any, error) {
+func (a *Analyzer) macroExpand(env core.Env, form ww.Any) (ww.Any, error) {
 	seq, ok := form.(core.Seq)
 	if !ok {
-		return nil, builtin.ErrNoExpand
+		return nil, ErrNoExpand
 	}
 
 	cnt, err := seq.Count()
@@ -253,7 +256,7 @@ func (a analyzer) macroExpand(env core.Env, form ww.Any) (ww.Any, error) {
 		return nil, err
 	}
 	if cnt == 0 {
-		return nil, builtin.ErrNoExpand
+		return nil, ErrNoExpand
 	}
 
 	first, err := seq.First()
@@ -266,13 +269,13 @@ func (a analyzer) macroExpand(env core.Env, form ww.Any) (ww.Any, error) {
 		var rex ResolveExpr
 		rex.Symbol.Any = any
 		if v, err = rex.Eval(env); err != nil {
-			return nil, builtin.ErrNoExpand
+			return nil, ErrNoExpand
 		}
 	}
 
 	fn, ok := v.(core.Fn)
 	if !ok || !fn.Macro() {
-		return nil, builtin.ErrNoExpand
+		return nil, ErrNoExpand
 	}
 
 	// pop head; seq is now args.
@@ -317,3 +320,7 @@ func resolve(env core.Env, symbol string) (any ww.Any, err error) {
 
 	return
 }
+
+type noSrc struct{}
+
+func (noSrc) Paths() PathSet { return PathSet{} }

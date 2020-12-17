@@ -2,10 +2,8 @@
 package lang
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/spy16/slurp"
 	capnp "zombiezen.com/go/capnproto2"
 
 	ww "github.com/wetware/ww/pkg"
@@ -13,34 +11,45 @@ import (
 	// _ "github.com/wetware/ww/pkg/lang/core/proc" // register default process types
 )
 
-// New returns a new root interpreter.
-func New(root ww.Anchor, srcPath ...string) (*slurp.Interpreter, error) {
-	if root == nil {
-		return nil, errors.New("nil anchor")
-	}
-
-	env := core.New()
-
-	a, err := newAnalyzer(root, srcPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return slurp.New(
-			slurp.WithEnv(env),
-			slurp.WithAnalyzer(a)),
-		prelude(env, a)
+// VM is a virtual machine that can evaluate forms.
+type VM struct {
+	Analyzer core.Analyzer
+	Env      core.Env
 }
 
-func prelude(env core.Env, a core.Analyzer) (err error) {
-	if err = loadBuiltins(env, a); err != nil {
-		return
-	}
-
-	return loadPrelude(env, a)
+// Eval a form.
+func (vm VM) Eval(form ww.Any) (ww.Any, error) {
+	return core.Eval(vm.Analyzer, vm.Env, form)
 }
 
-func loadPrelude(env core.Env, a core.Analyzer) error {
+// Init populates the default environment and loads the prelude.
+// This is done seperately from 'New' in order to support lazy initialization.
+func (vm VM) Init() (err error) {
+	if err = vm.loadBuiltins(); err == nil {
+		err = vm.loadPrelude()
+	}
+	return
+}
+
+func (vm VM) loadBuiltins() error {
+	return bindAll(vm.Env,
+		text("__version__", ww.Version),
+		text("__author__", "Louis Thibault"),
+		text("__copyright__", "2020, Louis Thibault\nAll rights reserved."),
+
+		anchor(),
+		comparison(),
+		container(),
+		function("error", "__error__", core.Raise),
+		function("nil?", "__isnil__", core.IsNil),
+		function("type", "__type__", fnTypeOf),
+		function("not", "__not__", fnNot),
+		function("read", "__read__", fnRead),
+		function("render", "__render__", core.Render),
+		function("print", "__print__", fnPrint))
+}
+
+func (vm VM) loadPrelude() error {
 	// We're effectively running `(import :prelude)`
 
 	sym, err := core.NewSymbol(capnp.SingleSegment(nil), "import")
@@ -59,7 +68,7 @@ func loadPrelude(env core.Env, a core.Analyzer) error {
 		return err
 	}
 
-	if _, err = core.Eval(env, a, form); err != nil {
+	if _, err = vm.Eval(form); err != nil {
 		err = fmt.Errorf("load prelude: %w", err)
 	}
 	return err

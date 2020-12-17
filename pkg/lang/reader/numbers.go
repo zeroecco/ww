@@ -9,15 +9,13 @@ import (
 	"strconv"
 	"strings"
 
-	score "github.com/spy16/slurp/core"
-	"github.com/spy16/slurp/reader"
-
 	capnp "zombiezen.com/go/capnproto2"
 
+	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 )
 
-func readNumber(rd *reader.Reader, init rune) (v score.Any, err error) {
+func readNumber(rd *Reader, init rune) (v ww.Any, err error) {
 	beginPos := rd.Position()
 
 	numStr, err := readNumToken(rd, init)
@@ -32,7 +30,7 @@ func readNumber(rd *reader.Reader, init rune) (v score.Any, err error) {
 
 	switch {
 	case isRadix && (decimalPoint || isScientific || isFrac):
-		err = reader.ErrNumberFormat
+		err = ErrNumberFormat
 
 	case isScientific:
 		v, err = parseScientific(numStr)
@@ -52,7 +50,7 @@ func readNumber(rd *reader.Reader, init rune) (v score.Any, err error) {
 	}
 
 	if err != nil {
-		err = annotateErr(rd, err, beginPos, numStr)
+		err = rd.annotateErr(err, beginPos, numStr)
 	}
 
 	return
@@ -68,13 +66,13 @@ func parseInt(numStr string) (core.Numerical, error) {
 	case errors.Is(err, strconv.ErrRange):
 		var b big.Int
 		if _, ok := b.SetString(numStr, 0); !ok {
-			return nil, fmt.Errorf("%w (bigint): '%s'", reader.ErrNumberFormat, numStr)
+			return nil, fmt.Errorf("%w (bigint): '%s'", ErrNumberFormat, numStr)
 		}
 
 		// TODO(performance):  pre-allocate arena
 		return core.NewBigInt(capnp.SingleSegment(nil), &b)
 	default:
-		return nil, fmt.Errorf("%w (int64): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (int64): '%s'", ErrNumberFormat, numStr)
 
 	}
 }
@@ -89,14 +87,14 @@ func parseFloat(numStr string) (core.Numerical, error) {
 	case errors.Is(err, strconv.ErrRange):
 		var f big.Float
 		if _, ok := f.SetString(numStr); !ok {
-			return nil, fmt.Errorf("%w (bigfloat): '%s'", reader.ErrNumberFormat, numStr)
+			return nil, fmt.Errorf("%w (bigfloat): '%s'", ErrNumberFormat, numStr)
 		}
 
 		// TODO(performance):  pre-allocate arena
 		return core.NewBigFloat(capnp.SingleSegment(nil), &f)
 
 	default:
-		return nil, reader.ErrNumberFormat
+		return nil, ErrNumberFormat
 
 	}
 }
@@ -104,12 +102,12 @@ func parseFloat(numStr string) (core.Numerical, error) {
 func parseRadix(numStr string) (core.Numerical, error) {
 	parts := strings.Split(numStr, "r")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("%w (radix notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (radix notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	base, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("%w (radix notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (radix notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	repr := parts[1]
@@ -122,13 +120,13 @@ func parseRadix(numStr string) (core.Numerical, error) {
 	if errors.Is(err, strconv.ErrRange) {
 		var bi big.Int
 		if _, ok := bi.SetString(repr, int(base)); !ok {
-			return nil, fmt.Errorf("%w (radix notation): '%s'", reader.ErrNumberFormat, numStr)
+			return nil, fmt.Errorf("%w (radix notation): '%s'", ErrNumberFormat, numStr)
 		}
 
 		return core.NewBigInt(capnp.SingleSegment(nil), &bi)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w (radix notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (radix notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	return core.NewInt64(capnp.SingleSegment(nil), v)
@@ -137,17 +135,17 @@ func parseRadix(numStr string) (core.Numerical, error) {
 func parseScientific(numStr string) (core.Numerical, error) {
 	parts := strings.Split(numStr, "e")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("%w (scientific notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	base, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
-		return nil, fmt.Errorf("%w (scientific notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	pow, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("%w (scientific notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	f := base * math.Pow(10, float64(pow))
@@ -155,7 +153,7 @@ func parseScientific(numStr string) (core.Numerical, error) {
 	if math.IsInf(f, 0) {
 		var bf big.Float
 		if _, ok := bf.SetString(numStr); !ok {
-			return nil, fmt.Errorf("%w (bigfloat): '%s'", reader.ErrNumberFormat, numStr)
+			return nil, fmt.Errorf("%w (bigfloat): '%s'", ErrNumberFormat, numStr)
 		}
 
 		return core.NewBigFloat(capnp.SingleSegment(nil), &bf)
@@ -167,15 +165,15 @@ func parseScientific(numStr string) (core.Numerical, error) {
 func parseFrac(numStr string) (core.Numerical, error) {
 	parts := strings.Split(numStr, "/")
 	if len(parts) != 2 || parts[1] == "" {
-		return nil, fmt.Errorf("%w (fractional notation): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (fractional notation): '%s'", ErrNumberFormat, numStr)
 	}
 
 	var numer, denom big.Int
 	if _, ok := numer.SetString(parts[0], 0); !ok {
-		return nil, fmt.Errorf("%w (numerator): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (numerator): '%s'", ErrNumberFormat, numStr)
 	}
 	if _, ok := denom.SetString(parts[1], 0); !ok {
-		return nil, fmt.Errorf("%w (denominator): '%s'", reader.ErrNumberFormat, numStr)
+		return nil, fmt.Errorf("%w (denominator): '%s'", ErrNumberFormat, numStr)
 	}
 
 	var r big.Rat
@@ -184,7 +182,7 @@ func parseFrac(numStr string) (core.Numerical, error) {
 
 // Token reads one token from the reader and returns. If init is not -1, it is included
 // as first character in the token.
-func readNumToken(rd *reader.Reader, init rune) (string, error) {
+func readNumToken(rd *Reader, init rune) (string, error) {
 	var b strings.Builder
 	if init != -1 {
 		b.WriteRune(init)

@@ -3,18 +3,20 @@ package lang
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 
-	"github.com/spy16/slurp"
 	"github.com/wetware/ww/internal/mem"
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
 	capnp "zombiezen.com/go/capnproto2"
 )
+
+// ErrParseSpecial is returned when parsing a special form invocation
+// fails due to malformed syntax.
+var ErrParseSpecial = errors.New("invalid special form")
 
 func parseDo(a core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
 	var de DoExpr
@@ -38,7 +40,7 @@ func parseIf(a core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
 		return nil, err
 	} else if count != 2 && count != 3 {
 		return nil, core.Error{
-			Cause:   fmt.Errorf("%w: if", slurp.ErrParseSpecial),
+			Cause:   fmt.Errorf("%w: if", ErrParseSpecial),
 			Message: fmt.Sprintf("requires 2 or 3 arguments, got %d", count),
 		}
 	}
@@ -73,7 +75,7 @@ func parseQuote(a core.Analyzer, _ core.Env, args core.Seq) (core.Expr, error) {
 		return nil, err
 	} else if count != 1 {
 		return nil, core.Error{
-			Cause:   fmt.Errorf("%w: quote", slurp.ErrParseSpecial),
+			Cause:   fmt.Errorf("%w: quote", ErrParseSpecial),
 			Message: fmt.Sprintf("requires exactly 1 argument, got %d", count),
 		}
 	}
@@ -83,11 +85,11 @@ func parseQuote(a core.Analyzer, _ core.Env, args core.Seq) (core.Expr, error) {
 		return nil, err
 	}
 
-	return QuoteExpr{Form: first}, nil
+	return ConstExpr{Form: first}, nil
 }
 
 func parseDef(a core.Analyzer, env core.Env, args core.Seq) (core.Expr, error) {
-	e := core.Error{Cause: fmt.Errorf("%w: def", slurp.ErrParseSpecial)}
+	e := core.Error{Cause: fmt.Errorf("%w: def", ErrParseSpecial)}
 
 	if args == nil {
 		return nil, e.With("requires exactly 2 args, got 0")
@@ -235,79 +237,70 @@ func parseEval(a core.Analyzer, env core.Env, seq core.Seq) (core.Expr, error) {
 	})
 }
 
-type importer []string
+func importParser(src PathProvider) SpecialParser {
+	return func(a core.Analyzer, _ core.Env, seq core.Seq) (core.Expr, error) {
+		if cnt, err := seq.Count(); err != nil {
+			return nil, err
+		} else if cnt != 1 {
+			return nil, fmt.Errorf("expected 1 argument, got %d", cnt)
+		}
 
-func (i importer) Parse(a core.Analyzer, _ core.Env, seq core.Seq) (core.Expr, error) {
-	if cnt, err := seq.Count(); err != nil {
-		return nil, err
-	} else if cnt != 1 {
-		return nil, fmt.Errorf("expected 1 argument, got %d", cnt)
-	}
-
-	arg, err := seq.First()
-	if err != nil {
-		return nil, err
-	}
-
-	var s string
-	var paths []string
-	switch mv := arg.Value(); mv.Which() {
-	case mem.Any_Which_keyword:
-		if s, err = mv.Keyword(); err != nil {
+		arg, err := seq.First()
+		if err != nil {
 			return nil, err
 		}
 
-		if s != "prelude" {
-			return nil, fmt.Errorf("unrecognize kwarg '%s'", s)
-		}
+		var s string
+		var paths []string
+		switch mv := arg.Value(); mv.Which() {
+		case mem.Any_Which_keyword:
+			if s, err = mv.Keyword(); err != nil {
+				return nil, err
+			}
 
-		for _, s = range i {
-			if s, err = i.resolvePath(s, ""); err == nil {
+			if s != "prelude" {
+				return nil, fmt.Errorf("unrecognize kwarg '%s'", s)
+			}
+
+			paths, err = src.Paths().prelude()
+
+		case mem.Any_Which_symbol:
+			if s, err = mv.Symbol(); err != nil {
+				return nil, err
+			}
+
+			if s, err = src.Paths().resolve(s); err == nil {
 				paths = append(paths, s)
 			}
+
+		default:
+			err = fmt.Errorf("invalid argument type %s", mv.Which())
+
 		}
 
-	case mem.Any_Which_symbol:
-		if s, err = mv.Symbol(); err != nil {
-			return nil, err
-		}
-
-		if s, err = i.resolve(s); err == nil {
-			paths = append(paths, s)
-		}
-
-	default:
-		err = fmt.Errorf("invalid argument type %s", mv.Which())
-
+		return ImportExpr{Analyzer: a, Paths: paths}, err
 	}
-
-	return ImportExpr{Analyzer: a, Paths: paths}, err
 }
 
-func (i importer) loadPrelude() (paths []string, err error) {
-	var files []os.FileInfo
-	for _, path := range i {
-		if files, err = ioutil.ReadDir(path); err != nil {
-			break
-		}
-
-		for _, f := range files {
-			if !f.IsDir() && strings.HasSuffix(f.Name(), ".ww") {
-				paths = append(paths, filepath.Join(path, f.Name()))
-			}
+func (ps PathSet) prelude() (paths []string, err error) {
+	var p string
+	paths = make([]string, 0, len(ps))
+	for _, root := range ps {
+		if p, err = ps.resolvePath(root, ""); err == nil {
+			paths = append(paths, p)
 		}
 	}
 
 	return
 }
 
-func (i importer) resolve(symbol string) (path string, err error) {
+func (ps PathSet) resolve(symbol string) (path string, err error) {
 	if symbol[0] == '.' {
-		return i.resolvePath(".", strings.TrimLeft(symbol, "."))
+		return ps.resolvePath(".", strings.TrimLeft(symbol, "."))
 	}
 
-	for _, root := range i {
-		if path, err = i.resolvePath(root, symbol); err == nil {
+	for _, root := range ps {
+		if path, err = ps.resolvePath(root, symbol); err == nil {
 			break
 		}
 	}
@@ -315,7 +308,9 @@ func (i importer) resolve(symbol string) (path string, err error) {
 	return path, err
 }
 
-func (importer) resolvePath(root, rel string) (string, error) {
+func (PathSet) resolvePath(root, rel string) (string, error) {
+	// TODO:  this does not handle /foo/bar/*.ww
+
 	path := filepath.Clean(filepath.Join(root, rel))
 	info, err := os.Stat(path)
 	if err != nil {
