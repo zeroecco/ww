@@ -156,8 +156,10 @@ func (repl *REPL) eval(forms []ww.Any) (res []ww.Any, err error) {
 }
 
 func (repl *REPL) print(forms []ww.Any) (err error) {
-	if len(forms) > 0 {
-		err = repl.Printer.Print(forms[len(forms)-1])
+	for _, form := range forms {
+		if err = repl.Printer.Print(form); err != nil {
+			break
+		}
 	}
 
 	return
