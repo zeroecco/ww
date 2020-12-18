@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 
 	ww "github.com/wetware/ww/pkg"
 	"github.com/wetware/ww/pkg/lang/core"
@@ -106,7 +105,10 @@ func (re ResolveExpr) Eval(env core.Env) (v ww.Any, err error) {
 	}
 
 	if err == core.ErrNotFound {
-		err = fmt.Errorf("%w: %s", core.ErrNotFound, re.Symbol)
+		err = core.Error{
+			Message: sym,
+			Cause:   core.ErrNotFound,
+		}
 	}
 
 	return
@@ -169,8 +171,10 @@ func (ie InvokeExpr) Eval(env core.Env) (any ww.Any, err error) {
 
 	fn, ok := any.(core.Invokable)
 	if !ok {
-		err = fmt.Errorf("%w '%s'", core.ErrNotInvokable, reflect.TypeOf(any))
-		return
+		return nil, core.Error{
+			Cause:   core.ErrNotInvokable,
+			Message: fmt.Sprintf("%s", any.Value().Which()),
+		}
 	}
 
 	args := make([]ww.Any, len(ie.Args))
