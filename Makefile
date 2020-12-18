@@ -28,3 +28,4 @@ mocks: cleanmocks
 fuzz:
 	# run fuzz tests with 'go-fuzz -bin reader-fuzz.zip'
 	@go-fuzz-build ./pkg/lang/reader/...
+	@go mod tidy  # go-fuzz-build adds itself to go.mod; remove it.
