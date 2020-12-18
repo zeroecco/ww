@@ -168,16 +168,58 @@ func parseFrac(numStr string) (core.Numerical, error) {
 		return nil, fmt.Errorf("%w (fractional notation): '%s'", ErrNumberFormat, numStr)
 	}
 
-	var numer, denom big.Int
-	if _, ok := numer.SetString(parts[0], 0); !ok {
-		return nil, fmt.Errorf("%w (numerator): '%s'", ErrNumberFormat, numStr)
+	rat, err := parseRatInt64(parts)
+	switch {
+	case err == nil:
+		break
+
+	case errors.Is(err, strconv.ErrRange):
+		if rat, err = parseRatBigInt(parts); err == nil {
+			break
+		}
+		fallthrough
+
+	default:
+		return nil, err
 	}
-	if _, ok := denom.SetString(parts[1], 0); !ok {
-		return nil, fmt.Errorf("%w (denominator): '%s'", ErrNumberFormat, numStr)
+
+	return core.NewFraction(capnp.SingleSegment(nil), rat)
+}
+
+func parseRatInt64(parts []string) (*big.Rat, error) {
+	numer, err := strconv.ParseInt(parts[0], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid numerator '%s'", ErrNumberFormat, parts[0])
+	}
+
+	denom, err := strconv.ParseInt(parts[1], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid denominator '%s'", ErrNumberFormat, parts[1])
+	}
+
+	if denom == 0 {
+		return nil, core.ErrDivideByZero
+	}
+
+	return big.NewRat(numer, denom), nil
+}
+
+func parseRatBigInt(parts []string) (*big.Rat, error) {
+	var ok bool
+	var numer, denom *big.Int
+	if numer, ok = numer.SetString(parts[0], 0); !ok {
+		return nil, fmt.Errorf("%w: invalid numerator '%s'", ErrNumberFormat, parts[0])
+	}
+	if denom, ok = denom.SetString(parts[1], 0); !ok {
+		return nil, fmt.Errorf("%w: invalid denominator '%s'", ErrNumberFormat, parts[1])
+	}
+
+	if denom.Sign() == 0 {
+		return nil, core.ErrDivideByZero
 	}
 
 	var r big.Rat
-	return core.NewFraction(capnp.SingleSegment(nil), r.SetFrac(&numer, &denom))
+	return r.SetFrac(numer, denom), nil
 }
 
 // Token reads one token from the reader and returns. If init is not -1, it is included

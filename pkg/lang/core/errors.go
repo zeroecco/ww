@@ -35,6 +35,9 @@ var (
 	// ErrMemory is returned when an operation is attempted against an illegally
 	// formatted datatype.
 	ErrMemory = errors.New("memory error")
+
+	// ErrDivideByZero is returned when a division by zero is attempted.
+	ErrDivideByZero = errors.New("divide by zero")
 )
 
 // Error is returned by all core operations. Cause indicates the underlying
