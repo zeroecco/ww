@@ -60,21 +60,15 @@ func parseInt(numStr string) (core.Numerical, error) {
 	v, err := strconv.ParseInt(numStr, 0, 64)
 	switch {
 	case err == nil:
-		// TODO(performance):  pre-allocate arena
 		return core.NewInt64(capnp.SingleSegment(nil), v)
 
 	case errors.Is(err, strconv.ErrRange):
-		var b big.Int
-		if _, ok := b.SetString(numStr, 0); !ok {
-			return nil, fmt.Errorf("%w (bigint): '%s'", ErrNumberFormat, numStr)
+		if b, ok := (&big.Int{}).SetString(numStr, 0); ok {
+			return core.NewBigInt(capnp.SingleSegment(nil), b)
 		}
 
-		// TODO(performance):  pre-allocate arena
-		return core.NewBigInt(capnp.SingleSegment(nil), &b)
-	default:
-		return nil, fmt.Errorf("%w (int64): '%s'", ErrNumberFormat, numStr)
-
 	}
+	return nil, fmt.Errorf("%w (int64): '%s'", ErrNumberFormat, numStr)
 }
 
 func parseFloat(numStr string) (core.Numerical, error) {
@@ -132,34 +126,51 @@ func parseRadix(numStr string) (core.Numerical, error) {
 	return core.NewInt64(capnp.SingleSegment(nil), v)
 }
 
-func parseScientific(numStr string) (core.Numerical, error) {
+func parseScientific(numStr string) (_ core.Numerical, err error) {
 	parts := strings.Split(numStr, "e")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
 	}
 
-	base, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
-	}
+	base, pow, err := parseScientificFloat64(parts)
+	switch {
+	case err == nil:
+		if num := base * math.Pow(10, pow); !math.IsInf(num, 0) {
+			return core.NewFloat64(capnp.SingleSegment(nil), num)
+		}
+		fallthrough
 
-	pow, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("%w (scientific notation): '%s'", ErrNumberFormat, numStr)
-	}
-
-	f := base * math.Pow(10, float64(pow))
-
-	if math.IsInf(f, 0) {
-		var bf big.Float
-		if _, ok := bf.SetString(numStr); !ok {
-			return nil, fmt.Errorf("%w (bigfloat): '%s'", ErrNumberFormat, numStr)
+	case errors.Is(err, strconv.ErrRange):
+		if f, ok := (&big.Float{}).SetString(numStr); ok {
+			return core.NewBigFloat(capnp.SingleSegment(nil), f)
 		}
 
-		return core.NewBigFloat(capnp.SingleSegment(nil), &bf)
 	}
 
-	return core.NewFloat64(capnp.SingleSegment(nil), f)
+	return nil, fmt.Errorf("%w (scientific): '%s'", ErrNumberFormat, numStr)
+}
+
+func parseScientificFloat64(parts []string) (base float64, pow float64, err error) {
+	mant, exp := parts[0], parts[1]
+	if base, err = strconv.ParseFloat(mant, 64); err != nil {
+		return
+	}
+
+	if pow, err = strconv.ParseFloat(exp, 64); err != nil {
+		return
+	}
+
+	if pow != math.Trunc(pow) {
+		return 0, 0, fmt.Errorf("invalid exponent: '%s'", exp)
+	}
+
+	// TODO:  remove this check once we're satisfied that fuzzing doesn't
+	// trigger this condition.
+	if math.IsInf(pow, 0) || math.IsNaN(pow) {
+		panic("unreachable")
+	}
+
+	return
 }
 
 func parseFrac(numStr string) (core.Numerical, error) {

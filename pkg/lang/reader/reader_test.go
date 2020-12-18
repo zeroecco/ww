@@ -3,6 +3,7 @@ package reader
 import (
 	"bytes"
 	"io"
+	"math/big"
 	"os"
 	"reflect"
 	"strings"
@@ -376,6 +377,11 @@ func TestReader_One_Number(t *testing.T) {
 			src:     "9.3.2",
 			wantErr: true,
 		},
+		{
+			name: "BigScientific",
+			src:  "1.84467440737095516159999e20",
+			want: mustBigFloat("1.84467440737095516159999e20"),
+		},
 	})
 }
 
@@ -664,7 +670,11 @@ func executeReaderTests(t *testing.T, tests []readerTestCase) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.Equal(t, tt.want, got)
+				eq, err := core.Eq(tt.want, got)
+				require.NoError(t, err)
+				assert.True(t, eq,
+					"expected '%s', got '%s'.",
+					mustRender(tt.want), mustRender(got))
 			}
 		})
 	}
@@ -708,4 +718,27 @@ func mustList(items ...ww.Any) core.List {
 func mustVec(items ...ww.Any) core.Vector {
 	v, _ := core.NewVector(capnp.SingleSegment(nil), items...)
 	return v
+}
+
+func mustBigFloat(q string) core.BigFloat {
+	var f big.Float
+	if _, ok := f.SetString(q); !ok {
+		panic("invalid float " + q)
+	}
+
+	bf, err := core.NewBigFloat(capnp.SingleSegment(nil), &f)
+	if err != nil {
+		panic(err)
+	}
+
+	return bf
+}
+
+func mustRender(item ww.Any) string {
+	s, err := core.Render(item)
+	if err != nil {
+		panic(err)
+	}
+
+	return s
 }
