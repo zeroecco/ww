@@ -21,6 +21,12 @@ import (
 const dispatchTrigger = '#'
 
 var (
+	symTable = map[string]ww.Any{
+		"nil":   core.Nil{},
+		"false": core.False,
+		"true":  core.True,
+	}
+
 	escapeMap = map[rune]rune{
 		'"':  '"',
 		'n':  '\n',
@@ -60,22 +66,21 @@ func init() {
 type Reader struct {
 	File string
 
-	rs                   io.RuneReader
-	buf                  []rune
-	line, col            int
-	lastCol              int
-	dispatching          bool
-	dispatch             map[rune]Macro
-	macros               map[rune]Macro
-	numReader, symReader Macro
+	rs          io.RuneReader
+	buf         []rune
+	line, col   int
+	lastCol     int
+	dispatching bool
+	dispatch    map[rune]Macro
+	macros      map[rune]Macro
 }
 
 // New returns a lisp reader instance which can read forms from r. Returned instance
 // supports only primitive data  types from value package by default. Support for
 // custom forms can be added using SetMacro(). File name is inferred from the value &
 // type information of 'r' OR can be set manually on the Reader instance returned.
-func New(r io.Reader, opts ...Option) *Reader {
-	rd := &Reader{
+func New(r io.Reader) *Reader {
+	return &Reader{
 		File: inferFileName(r),
 		rs:   bufio.NewReader(r),
 		macros: map[rune]Macro{
@@ -94,12 +99,6 @@ func New(r io.Reader, opts ...Option) *Reader {
 		},
 		dispatch: map[rune]Macro{},
 	}
-
-	for _, option := range withDefaults(opts) {
-		option(rd)
-	}
-
-	return rd
 }
 
 // Reset clears all state from the reader and assigns the specified byte stream
@@ -343,7 +342,7 @@ func (rd *Reader) readOne() (ww.Any, error) {
 	}
 
 	if unicode.IsNumber(r) {
-		return rd.numReader(rd, r)
+		return readNumber(rd, r)
 	} else if r == '+' || r == '-' {
 		r2, err := rd.NextRune()
 		if err != nil && err != io.EOF {
@@ -353,7 +352,7 @@ func (rd *Reader) readOne() (ww.Any, error) {
 		if err != io.EOF {
 			rd.Unread(r2)
 			if unicode.IsNumber(r2) {
-				return rd.numReader(rd, r)
+				return readNumber(rd, r)
 			}
 		}
 	}
@@ -370,7 +369,7 @@ func (rd *Reader) readOne() (ww.Any, error) {
 		}
 	}
 
-	return rd.symReader(rd, r)
+	return readSymbol(rd, r)
 }
 
 func (rd *Reader) execDispatch() (ww.Any, error) {

@@ -28,22 +28,21 @@ func UnmatchedDelimiter() Macro {
 	}
 }
 
-func symbolReader(symTable map[string]ww.Any) Macro {
-	return func(rd *Reader, init rune) (ww.Any, error) {
-		beginPos := rd.Position()
+func readSymbol(rd *Reader, init rune) (ww.Any, error) {
+	beginPos := rd.Position()
 
-		s, err := rd.Token(init)
-		if err != nil {
-			return nil, rd.annotateErr(err, beginPos, s)
-		}
-
-		if predefVal, found := symTable[s]; found {
-			return predefVal, nil
-		}
-
-		// TODO(performance):  pre-allocate
-		return core.NewSymbol(capnp.SingleSegment(nil), s)
+	s, err := rd.Token(init)
+	if err != nil {
+		return nil, rd.annotateErr(err, beginPos, s)
 	}
+
+	// check if the symbol exists in the pre-defined symbol table.
+	if predefVal, found := symTable[s]; found {
+		return predefVal, nil
+	}
+
+	// TODO(performance):  pre-allocate
+	return core.NewSymbol(capnp.SingleSegment(nil), s)
 }
 
 func readString(rd *Reader, init rune) (ww.Any, error) {
