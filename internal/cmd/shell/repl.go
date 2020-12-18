@@ -2,7 +2,6 @@ package shell
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -95,15 +94,15 @@ func (repl *REPL) Next() {
 func (repl *REPL) next() error {
 	forms, err := repl.read()
 	if err != nil {
-		return fmt.Errorf("read: %w", err)
+		return err
 	}
 
 	if forms, err = repl.eval(forms); err != nil {
-		return fmt.Errorf("eval: %w", err)
+		return err
 	}
 
 	if err = repl.print(forms); err != nil {
-		return fmt.Errorf("print: %w", err)
+		return err
 	}
 
 	return nil
