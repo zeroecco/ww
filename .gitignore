@@ -17,3 +17,9 @@
 # Wetware
 cmd/scratch/*
 **/__history__.ww
+
+# Fuzz testing
+*-fuzz.zip
+corpus/*
+crashers/*
+suppressions/*

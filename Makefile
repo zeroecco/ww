@@ -24,3 +24,7 @@ mocks: cleanmocks
 	#  - prevent grep missing (totally fine) from causing nonzero exit
 	#  - mirror the pkg/ structure under internal/test/mock
 	@find . -name '*.go' | xargs -I{} grep -l '//go:generate' {} | xargs -I{} -P 10 go generate {}
+
+fuzz:
+	# run fuzz tests with 'go-fuzz -bin reader-fuzz.zip'
+	@go-fuzz-build ./pkg/lang/reader/...

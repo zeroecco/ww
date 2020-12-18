@@ -42,7 +42,9 @@ require (
 	go.uber.org/fx v1.13.1
 	go.uber.org/multierr v1.6.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/mod v0.4.0 // indirect
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
+	golang.org/x/tools v0.0.0-20201217235154-5b06639e575e // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	zombiezen.com/go/capnproto2 v2.17.1-0.20200824221555-5246e512e430+incompatible
 )
