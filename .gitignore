@@ -14,12 +14,30 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Wetware
+#***********#
+#  Wetware  #
+#***********#
+
+#
+# Fuzz testing
+#
+
+# Ignore all go-fuzz-build artefacts.
+*-fuzz.zip
+
+# Ingore the go-fuzz workdir.
+test/fuzz/*
+
+# Belt-and-suspenders; users may inadvertently
+# run fuzz tests without specifying a workdir,
+# in which case the project root will be polluted
+# with output from go-fuzz.
+./corpus/*
+./crashers/*
+./suppressions/*
+
+#
+# Misc.
+#
 cmd/scratch/*
 **/__history__.ww
-
-# Fuzz testing
-*-fuzz.zip
-corpus/*
-crashers/*
-suppressions/*

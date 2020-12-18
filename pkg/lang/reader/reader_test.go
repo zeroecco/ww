@@ -317,10 +317,14 @@ func TestReader_One_Number(t *testing.T) {
 			want: mustFloat64(1.5e+10),
 		},
 		{
-			name:    "FloatStartingWith0",
-			src:     "012.3",
-			want:    mustFloat64(012.3),
-			wantErr: false,
+			name: "FloatStartingWith0",
+			src:  "012.3",
+			want: mustFloat64(012.3),
+		},
+		{
+			name: "BigScientific",
+			src:  "1.84467440737095516159999e20",
+			want: mustBigFloat("1.84467440737095516159999e20"),
 		},
 		{
 			name:    "InvalidValue",
@@ -376,11 +380,6 @@ func TestReader_One_Number(t *testing.T) {
 			name:    "IllegalNumberFormat",
 			src:     "9.3.2",
 			wantErr: true,
-		},
-		{
-			name: "BigScientific",
-			src:  "1.84467440737095516159999e20",
-			want: mustBigFloat("1.84467440737095516159999e20"),
 		},
 	})
 }

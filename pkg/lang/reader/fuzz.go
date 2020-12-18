@@ -1,5 +1,12 @@
 // +build gofuzz
 
+/*
+ *	Fuzz test harness.
+ *
+ *  To build:  make fuzz-target
+ *  To run:    make fuzz
+ */
+
 package reader
 
 import (
