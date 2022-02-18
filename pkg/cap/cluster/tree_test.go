@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,63 +19,30 @@ var paths = [][]string{
 
 func TestWalk(t *testing.T) {
 	t.Parallel()
-	t.Helper()
 
-	t.Run("ManualRelease", func(t *testing.T) {
-		t.Parallel()
+	for _, path := range paths {
+		t.Run(fmt.Sprintf("Depth-%d", len(path)), func(t *testing.T) {
+			t.Parallel()
 
-		for _, path := range paths {
-			t.Run(fmt.Sprintf("Depth-%d", len(path)), func(t *testing.T) {
-				t.Parallel()
+			var root node
+			cs, release := root.Children()
+			require.Empty(t, cs, "should not have children initially")
+			require.Empty(t, root.Path(), "root anchor should have empty path")
+			release()
 
-				var root node
-				cs, release := root.Children()
-				require.Empty(t, cs, "should not have children initially")
-				require.Empty(t, root.Path(), "root anchor should have empty path")
-				release()
+			test := root.Walk(path)
 
-				test := root.Walk(path)
+			cs, release = root.Children()
+			require.NotEmpty(t, cs, "root should have child")
+			release()
 
-				cs, release = root.Children()
-				require.NotEmpty(t, cs, "root should have child")
-				release()
+			test.Release()
 
-				test.Release()
-
-				cs, release = root.Children()
-				assert.Empty(t, cs, "root should not have children")
-				release()
-			})
-		}
-	})
-
-	t.Run("Finalizer", func(t *testing.T) {
-		t.Parallel()
-
-		for _, path := range paths {
-			t.Run(fmt.Sprintf("Depth-%d", len(path)), func(t *testing.T) {
-				t.Parallel()
-
-				var root node
-				cs, release := root.Children()
-				require.Empty(t, cs, "should not have children initially")
-				require.Empty(t, root.Path(), "root anchor should have empty path")
-				release()
-
-				root.Walk(path)
-
-				cs, release = root.Children()
-				require.NotEmpty(t, cs, "root should have child")
-				release()
-
-				runtime.GC()
-
-				cs, release = root.Children()
-				assert.Empty(t, cs, "root should not have children")
-				release()
-			})
-		}
-	})
+			cs, release = root.Children()
+			assert.Empty(t, cs, "root should not have children")
+			release()
+		})
+	}
 }
 
 var n *node
