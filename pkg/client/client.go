@@ -2,6 +2,8 @@
 package client
 
 import (
+	"context"
+
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -49,3 +51,11 @@ func (n Node) Close() error {
 }
 
 func (n Node) PubSub() pscap.PubSub { return n.ps }
+
+func (n Node) Ls(ctx context.Context) (AnchorSet, error) {
+
+}
+
+func (n Node) Walk(ctx context.Context, path []string) Anchor {
+
+}

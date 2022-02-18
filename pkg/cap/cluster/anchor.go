@@ -10,6 +10,9 @@ import (
 // HACK:  attempt at writing a client...
 type Anchor cluster.Anchor
 
+func (a Anchor) AddRef() Anchor { return Anchor{a.Client.AddRef()} }
+func (a Anchor) Release()       { a.Client.Release() }
+
 func (a Anchor) Ls(ctx context.Context, ps func(cluster.Anchor_ls_Params) error) (FutureAnchor, capnp.ReleaseFunc) {
 	f, release := cluster.Anchor(a).Ls(ctx, ps)
 	return FutureAnchor(f), release
