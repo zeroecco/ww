@@ -31,6 +31,8 @@ func TestRootAnchor(t *testing.T) {
 	client := anchor.NewAnchorClient(rt)
 
 	it, err := client.Ls(ctx, []string{"/"})
+	defer it.Finish()
+
 	require.NoError(t, err)
 
 	for i := 0; it.Next(ctx); i++ {

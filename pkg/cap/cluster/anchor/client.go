@@ -37,7 +37,7 @@ func (ac AnchorClient) Ls(ctx context.Context, path []string) (AnchorIterator, e
 	if len(path) == 1 {
 		vf := cluster.ViewFactory{View: ac.router}
 		it, release := vf.NewClient(&defaultPolicy).Iter(ctx)
-		return HostAnchorIterator{
+		return &HostAnchorIterator{
 			path:    []string{"/"},
 			it:      it,
 			release: release,

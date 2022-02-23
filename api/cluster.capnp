@@ -11,9 +11,9 @@ interface Anchor {
     path @0 () -> (path :Text);
 }
 
-interface AnchorManager {
-    ls @1 (path :Text) -> (anchors :List(Anchor));
-    walk @2 (path :Text) -> (anchor :Anchor);
+interface AnchorProvider {
+    ls @0 (path :Text) -> (anchors :List(Anchor));
+    walk @1 (path :Text) -> (anchor :Anchor);
 }
 
 

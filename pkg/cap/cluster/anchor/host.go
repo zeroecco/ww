@@ -27,11 +27,15 @@ type HostAnchorIterator struct {
 	release capnp.ReleaseFunc
 }
 
-func (hai HostAnchorIterator) Next(ctx context.Context) bool {
+func (hai *HostAnchorIterator) Next(ctx context.Context) bool {
 	return hai.it.Next(ctx)
 }
 
-func (hai HostAnchorIterator) Anchor() Anchor {
+func (hai *HostAnchorIterator) Anchor() Anchor {
 	rec := hai.it.Record()
 	return &HostAnchorImpl{path: append(hai.path, rec.Peer().String()), rec: rec}
+}
+
+func (hai *HostAnchorIterator) Finish() {
+	hai.release()
 }

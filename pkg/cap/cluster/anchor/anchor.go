@@ -12,6 +12,7 @@ type AnchorProvider interface {
 type AnchorIterator interface {
 	Next(ctx context.Context) bool
 	Anchor() Anchor
+	Finish()
 }
 
 type Anchor interface {
