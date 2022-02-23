@@ -3,8 +3,10 @@ package anchor
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"capnproto.org/go/capnp/v3/server"
+	"github.com/hashicorp/go-multierror"
 	"github.com/wetware/ww/pkg/cap/cluster"
 )
 
@@ -46,6 +48,35 @@ func (ac AnchorClient) Ls(ctx context.Context, path []string) (AnchorIterator, e
 	return nil, nil
 }
 
+func (ac AnchorClient) Walk(ctx context.Context, path []string) (Anchor, error) {
+	if !isValid(path) {
+		return nil, ErrInvalidPath
+	}
+	if len(path) == 1 { // root anchor
+		return RootAnchor{}, nil
+	} else if len(path) == 2 {
+		vf := cluster.ViewFactory{View: ac.router}
+		it, release := vf.NewClient(&defaultPolicy).Iter(ctx)
+		defer release()
+
+		for it.Next(ctx) {
+			if strings.Compare(it.Record().Peer().String(), path[1]) == 0 {
+				return &HostAnchorImpl{path: path, rec: it.Record()}, nil
+			}
+		}
+		return nil, multierror.Append(ErrInvalidPath, errors.New("host anchor does not exist"))
+	} else {
+		// TODO
+		return nil, nil
+	}
+}
+
 func isValid(path []string) bool {
 	return true // TODO
+}
+
+type RootAnchor struct{}
+
+func (ra RootAnchor) Path() []string {
+	return []string{"/"}
 }
