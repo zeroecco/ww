@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wetware/ww/pkg/cap/cluster"
+	"github.com/wetware/ww/pkg/cap/cluster/anchor"
 )
 
 func TestRootAnchor(t *testing.T) {
@@ -28,7 +28,7 @@ func TestRootAnchor(t *testing.T) {
 		}
 	}
 
-	client := cluster.NewAnchorClient(rt)
+	client := anchor.NewAnchorClient(rt)
 
 	it, err := client.Ls(ctx, []string{"/"})
 	require.NoError(t, err)
@@ -39,10 +39,7 @@ func TestRootAnchor(t *testing.T) {
 		path := a.Path()
 		require.Equal(t, "/"+rt[i].Peer().String(), strings.Join(path, ""))
 
-		err := a.Set(ctx, "test")
-		require.Error(t, err)
-
-		ha, ok := a.(cluster.HostAnchor)
+		ha, ok := a.(anchor.HostAnchor)
 		require.True(t, ok)
 		require.Equal(t, rt[i].Peer().String(), ha.Host())
 	}
