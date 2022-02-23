@@ -2,43 +2,94 @@ package cluster
 
 import (
 	"context"
+	"errors"
 
 	"capnproto.org/go/capnp/v3"
-	"github.com/wetware/ww/internal/api/cluster"
+	"github.com/hashicorp/go-multierror"
+	"github.com/wetware/casm/pkg/cluster/routing"
 )
 
 // HACK:  attempt at writing a client...
-type Anchor cluster.Anchor
 
-func (a Anchor) AddRef() Anchor { return Anchor{a.Client.AddRef()} }
-func (a Anchor) Release()       { a.Client.Release() }
+var (
+	ErrInvalidPath      = errors.New("invalid path")
+	ErrInvalidOperation = errors.New("invalid operation")
+)
 
-func (a Anchor) Ls(ctx context.Context, ps func(cluster.Anchor_ls_Params) error) (FutureAnchor, capnp.ReleaseFunc) {
-	f, release := cluster.Anchor(a).Ls(ctx, ps)
-	return FutureAnchor(f), release
+type AnchorIterator interface {
+	Next(ctx context.Context) bool
+	Anchor() Anchor
 }
 
-func (a Anchor) Walk(ctx context.Context, ps func(cluster.Anchor_walk_Params) error) (cluster.Anchor_walk_Results_Future, capnp.ReleaseFunc) {
-	panic("NOT IMPLEMENTED")
+type Anchor interface {
+	Path() []string
+	Set(context.Context, interface{}) error
 }
 
-type FutureAnchor cluster.Anchor_ls_Results_Future
-
-type RootAnchor struct {
-	Cluster RoutingTable
+type HostAnchor interface {
+	Anchor
+	Host() string
 }
 
-func (root RootAnchor) Ls(ctx context.Context, call cluster.Anchor_ls) error {
-	res, err := call.AllocResults()
-	if err != nil {
-		return err
+type AnchorClient struct {
+	router RoutingTable
+}
+
+func NewAnchorClient(router RoutingTable) AnchorClient {
+	return AnchorClient{router: router}
+}
+
+type HostAnchorImpl struct {
+	path []string
+	rec  routing.Record
+}
+
+func (hai *HostAnchorImpl) Path() []string {
+	return hai.path
+}
+
+func (hai *HostAnchorImpl) Set(context.Context, interface{}) error {
+	return multierror.Append(errors.New("host anchor"), ErrInvalidOperation)
+}
+
+func (hai *HostAnchorImpl) Host() string {
+	return hai.rec.Peer().String()
+}
+
+type HostAnchorIterator struct {
+	path    []string
+	it      *Iterator
+	release capnp.ReleaseFunc
+}
+
+func (hai HostAnchorIterator) Next(ctx context.Context) bool {
+	return hai.it.Next(ctx)
+}
+
+func (hai HostAnchorIterator) Anchor() Anchor {
+	rec := hai.it.Record()
+	return &HostAnchorImpl{path: append(hai.path, rec.Peer().String()), rec: rec}
+}
+
+func (ac AnchorClient) Ls(ctx context.Context, path []string) (AnchorIterator, error) {
+	if !isValid(path) {
+		return nil, ErrInvalidPath
 	}
 
-	view := ViewFactory{root.Cluster}.NewClient(nil)
-
-	return res.SetView(cluster.View(view))
+	if len(path) == 1 {
+		vf := ViewFactory{ac.router}
+		it, release := vf.NewClient(&defaultPolicy).Iter(ctx)
+		return HostAnchorIterator{
+			path:    []string{"/"},
+			it:      it,
+			release: release,
+		}, nil
+	} else {
+		// TODO
+	}
+	return nil, nil
 }
 
-func (root RootAnchor) Walk(ctx context.Context, call cluster.Anchor_walk) error {
-	panic("NOT IMPLEMENTED")
+func isValid(path []string) bool {
+	return true // TODO
 }

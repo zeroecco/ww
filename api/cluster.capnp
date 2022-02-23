@@ -6,9 +6,15 @@ $Go.package("cluster");
 $Go.import("github.com/wetware/ww/internal/api/cluster");
 
 
+
 interface Anchor {
-    ls @0 () -> (view :View);
-    walk @1 (path :Text) -> (anchor :Anchor);
+    set @0 () -> ();
+}
+
+interface AnchorManager {
+    path @0 () -> (path :Text);
+    ls @1 (path :Text) -> (anchors :List(Anchor));
+    walk @2 (path :Text) -> (anchor :Anchor);
 }
 
 
