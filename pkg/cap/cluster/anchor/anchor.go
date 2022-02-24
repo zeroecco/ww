@@ -26,20 +26,16 @@ type HostAnchor interface {
 
 type ContainerAnchor interface {
 	Anchor
-	Set(context.Context, interface{}) error
-}
-
-type DataAnchor interface {
-	ContainerAnchor
-	Get(context.Context) interface{}
+	Set(context.Context, []byte) error
+	Get(context.Context) ([]byte, error)
 }
 
 type ProcessAnchor interface {
-	ContainerAnchor
+	Anchor
 	//TODO
 }
 
 type ChannelAnchor interface {
-	ContainerAnchor
+	Anchor
 	//TODO
 }

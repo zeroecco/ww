@@ -7,14 +7,23 @@ $Go.import("github.com/wetware/ww/internal/api/cluster");
 
 
 
-interface Anchor {
-    path @0 () -> (path :Text);
+interface AnchorProvider {
+    ls @0 (path :List(Text)) -> (anchors :List(Anchor));
+    walk @1 (path :List(Text)) -> (anchor :Anchor);
 }
 
-interface AnchorProvider {
-    ls @0 (path :Text) -> (anchors :List(Anchor));
-    walk @1 (path :Text) -> (anchor :Anchor);
+
+struct Anchor {
+    path @0 :Text;
+    container @1 :Container;
+    
+    interface Container {
+        set @0 (data :Data) -> ();
+        get @1 () -> (data :Data);
+    }
 }
+
+
 
 
 # interface Host extends(Anchor) {

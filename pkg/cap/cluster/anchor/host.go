@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"capnproto.org/go/capnp/v3"
-	"github.com/wetware/casm/pkg/cluster/routing"
 	"github.com/wetware/ww/pkg/cap/cluster"
 )
 
 type HostAnchorImpl struct {
 	path []string
-	rec  routing.Record
+	host string
 }
 
 func (hai *HostAnchorImpl) Path() []string {
@@ -18,7 +17,7 @@ func (hai *HostAnchorImpl) Path() []string {
 }
 
 func (hai *HostAnchorImpl) Host() string {
-	return hai.rec.Peer().String()
+	return hai.host
 }
 
 type HostAnchorIterator struct {
@@ -33,7 +32,7 @@ func (hai *HostAnchorIterator) Next(ctx context.Context) bool {
 
 func (hai *HostAnchorIterator) Anchor() Anchor {
 	rec := hai.it.Record()
-	return &HostAnchorImpl{path: append(hai.path, rec.Peer().String()), rec: rec}
+	return &HostAnchorImpl{path: append(hai.path, rec.Peer().String()), host: rec.Peer().String()}
 }
 
 func (hai *HostAnchorIterator) Finish() {

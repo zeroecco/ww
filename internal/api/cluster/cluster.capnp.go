@@ -10,222 +10,6 @@ import (
 	context "context"
 )
 
-type Anchor struct{ Client *capnp.Client }
-
-// Anchor_TypeID is the unique identifier for the type Anchor.
-const Anchor_TypeID = 0xbe89922d1c49d9c5
-
-func (c Anchor) Path(ctx context.Context, params func(Anchor_path_Params) error) (Anchor_path_Results_Future, capnp.ReleaseFunc) {
-	s := capnp.Send{
-		Method: capnp.Method{
-			InterfaceID:   0xbe89922d1c49d9c5,
-			MethodID:      0,
-			InterfaceName: "cluster.capnp:Anchor",
-			MethodName:    "path",
-		},
-	}
-	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 0}
-		s.PlaceArgs = func(s capnp.Struct) error { return params(Anchor_path_Params{Struct: s}) }
-	}
-	ans, release := c.Client.SendCall(ctx, s)
-	return Anchor_path_Results_Future{Future: ans.Future()}, release
-}
-
-func (c Anchor) AddRef() Anchor {
-	return Anchor{
-		Client: c.Client.AddRef(),
-	}
-}
-
-func (c Anchor) Release() {
-	c.Client.Release()
-}
-
-// A Anchor_Server is a Anchor with a local implementation.
-type Anchor_Server interface {
-	Path(context.Context, Anchor_path) error
-}
-
-// Anchor_NewServer creates a new Server from an implementation of Anchor_Server.
-func Anchor_NewServer(s Anchor_Server, policy *server.Policy) *server.Server {
-	c, _ := s.(server.Shutdowner)
-	return server.New(Anchor_Methods(nil, s), s, c, policy)
-}
-
-// Anchor_ServerToClient creates a new Client from an implementation of Anchor_Server.
-// The caller is responsible for calling Release on the returned Client.
-func Anchor_ServerToClient(s Anchor_Server, policy *server.Policy) Anchor {
-	return Anchor{Client: capnp.NewClient(Anchor_NewServer(s, policy))}
-}
-
-// Anchor_Methods appends Methods to a slice that invoke the methods on s.
-// This can be used to create a more complicated Server.
-func Anchor_Methods(methods []server.Method, s Anchor_Server) []server.Method {
-	if cap(methods) == 0 {
-		methods = make([]server.Method, 0, 1)
-	}
-
-	methods = append(methods, server.Method{
-		Method: capnp.Method{
-			InterfaceID:   0xbe89922d1c49d9c5,
-			MethodID:      0,
-			InterfaceName: "cluster.capnp:Anchor",
-			MethodName:    "path",
-		},
-		Impl: func(ctx context.Context, call *server.Call) error {
-			return s.Path(ctx, Anchor_path{call})
-		},
-	})
-
-	return methods
-}
-
-// Anchor_path holds the state for a server call to Anchor.path.
-// See server.Call for documentation.
-type Anchor_path struct {
-	*server.Call
-}
-
-// Args returns the call's arguments.
-func (c Anchor_path) Args() Anchor_path_Params {
-	return Anchor_path_Params{Struct: c.Call.Args()}
-}
-
-// AllocResults allocates the results struct.
-func (c Anchor_path) AllocResults() (Anchor_path_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Anchor_path_Results{Struct: r}, err
-}
-
-type Anchor_path_Params struct{ capnp.Struct }
-
-// Anchor_path_Params_TypeID is the unique identifier for the type Anchor_path_Params.
-const Anchor_path_Params_TypeID = 0xd377c9b486ad95d5
-
-func NewAnchor_path_Params(s *capnp.Segment) (Anchor_path_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
-	return Anchor_path_Params{st}, err
-}
-
-func NewRootAnchor_path_Params(s *capnp.Segment) (Anchor_path_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
-	return Anchor_path_Params{st}, err
-}
-
-func ReadRootAnchor_path_Params(msg *capnp.Message) (Anchor_path_Params, error) {
-	root, err := msg.Root()
-	return Anchor_path_Params{root.Struct()}, err
-}
-
-func (s Anchor_path_Params) String() string {
-	str, _ := text.Marshal(0xd377c9b486ad95d5, s.Struct)
-	return str
-}
-
-// Anchor_path_Params_List is a list of Anchor_path_Params.
-type Anchor_path_Params_List struct{ capnp.List }
-
-// NewAnchor_path_Params creates a new list of Anchor_path_Params.
-func NewAnchor_path_Params_List(s *capnp.Segment, sz int32) (Anchor_path_Params_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
-	return Anchor_path_Params_List{l}, err
-}
-
-func (s Anchor_path_Params_List) At(i int) Anchor_path_Params {
-	return Anchor_path_Params{s.List.Struct(i)}
-}
-
-func (s Anchor_path_Params_List) Set(i int, v Anchor_path_Params) error {
-	return s.List.SetStruct(i, v.Struct)
-}
-
-func (s Anchor_path_Params_List) String() string {
-	str, _ := text.MarshalList(0xd377c9b486ad95d5, s.List)
-	return str
-}
-
-// Anchor_path_Params_Future is a wrapper for a Anchor_path_Params promised by a client call.
-type Anchor_path_Params_Future struct{ *capnp.Future }
-
-func (p Anchor_path_Params_Future) Struct() (Anchor_path_Params, error) {
-	s, err := p.Future.Struct()
-	return Anchor_path_Params{s}, err
-}
-
-type Anchor_path_Results struct{ capnp.Struct }
-
-// Anchor_path_Results_TypeID is the unique identifier for the type Anchor_path_Results.
-const Anchor_path_Results_TypeID = 0xb0fd7286c7f13ef3
-
-func NewAnchor_path_Results(s *capnp.Segment) (Anchor_path_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Anchor_path_Results{st}, err
-}
-
-func NewRootAnchor_path_Results(s *capnp.Segment) (Anchor_path_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
-	return Anchor_path_Results{st}, err
-}
-
-func ReadRootAnchor_path_Results(msg *capnp.Message) (Anchor_path_Results, error) {
-	root, err := msg.Root()
-	return Anchor_path_Results{root.Struct()}, err
-}
-
-func (s Anchor_path_Results) String() string {
-	str, _ := text.Marshal(0xb0fd7286c7f13ef3, s.Struct)
-	return str
-}
-
-func (s Anchor_path_Results) Path() (string, error) {
-	p, err := s.Struct.Ptr(0)
-	return p.Text(), err
-}
-
-func (s Anchor_path_Results) HasPath() bool {
-	return s.Struct.HasPtr(0)
-}
-
-func (s Anchor_path_Results) PathBytes() ([]byte, error) {
-	p, err := s.Struct.Ptr(0)
-	return p.TextBytes(), err
-}
-
-func (s Anchor_path_Results) SetPath(v string) error {
-	return s.Struct.SetText(0, v)
-}
-
-// Anchor_path_Results_List is a list of Anchor_path_Results.
-type Anchor_path_Results_List struct{ capnp.List }
-
-// NewAnchor_path_Results creates a new list of Anchor_path_Results.
-func NewAnchor_path_Results_List(s *capnp.Segment, sz int32) (Anchor_path_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
-	return Anchor_path_Results_List{l}, err
-}
-
-func (s Anchor_path_Results_List) At(i int) Anchor_path_Results {
-	return Anchor_path_Results{s.List.Struct(i)}
-}
-
-func (s Anchor_path_Results_List) Set(i int, v Anchor_path_Results) error {
-	return s.List.SetStruct(i, v.Struct)
-}
-
-func (s Anchor_path_Results_List) String() string {
-	str, _ := text.MarshalList(0xb0fd7286c7f13ef3, s.List)
-	return str
-}
-
-// Anchor_path_Results_Future is a wrapper for a Anchor_path_Results promised by a client call.
-type Anchor_path_Results_Future struct{ *capnp.Future }
-
-func (p Anchor_path_Results_Future) Struct() (Anchor_path_Results, error) {
-	s, err := p.Future.Struct()
-	return Anchor_path_Results{s}, err
-}
-
 type AnchorProvider struct{ Client *capnp.Client }
 
 // AnchorProvider_TypeID is the unique identifier for the type AnchorProvider.
@@ -386,22 +170,28 @@ func (s AnchorProvider_ls_Params) String() string {
 	return str
 }
 
-func (s AnchorProvider_ls_Params) Path() (string, error) {
+func (s AnchorProvider_ls_Params) Path() (capnp.TextList, error) {
 	p, err := s.Struct.Ptr(0)
-	return p.Text(), err
+	return capnp.TextList{List: p.List()}, err
 }
 
 func (s AnchorProvider_ls_Params) HasPath() bool {
 	return s.Struct.HasPtr(0)
 }
 
-func (s AnchorProvider_ls_Params) PathBytes() ([]byte, error) {
-	p, err := s.Struct.Ptr(0)
-	return p.TextBytes(), err
+func (s AnchorProvider_ls_Params) SetPath(v capnp.TextList) error {
+	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
-func (s AnchorProvider_ls_Params) SetPath(v string) error {
-	return s.Struct.SetText(0, v)
+// NewPath sets the path field to a newly
+// allocated capnp.TextList, preferring placement in s's segment.
+func (s AnchorProvider_ls_Params) NewPath(n int32) (capnp.TextList, error) {
+	l, err := capnp.NewTextList(s.Struct.Segment(), n)
+	if err != nil {
+		return capnp.TextList{}, err
+	}
+	err = s.Struct.SetPtr(0, l.List.ToPtr())
+	return l, err
 }
 
 // AnchorProvider_ls_Params_List is a list of AnchorProvider_ls_Params.
@@ -459,25 +249,25 @@ func (s AnchorProvider_ls_Results) String() string {
 	return str
 }
 
-func (s AnchorProvider_ls_Results) Anchors() (capnp.PointerList, error) {
+func (s AnchorProvider_ls_Results) Anchors() (Anchor_List, error) {
 	p, err := s.Struct.Ptr(0)
-	return capnp.PointerList{List: p.List()}, err
+	return Anchor_List{List: p.List()}, err
 }
 
 func (s AnchorProvider_ls_Results) HasAnchors() bool {
 	return s.Struct.HasPtr(0)
 }
 
-func (s AnchorProvider_ls_Results) SetAnchors(v capnp.PointerList) error {
+func (s AnchorProvider_ls_Results) SetAnchors(v Anchor_List) error {
 	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
 // NewAnchors sets the anchors field to a newly
-// allocated capnp.PointerList, preferring placement in s's segment.
-func (s AnchorProvider_ls_Results) NewAnchors(n int32) (capnp.PointerList, error) {
-	l, err := capnp.NewPointerList(s.Struct.Segment(), n)
+// allocated Anchor_List, preferring placement in s's segment.
+func (s AnchorProvider_ls_Results) NewAnchors(n int32) (Anchor_List, error) {
+	l, err := NewAnchor_List(s.Struct.Segment(), n)
 	if err != nil {
-		return capnp.PointerList{}, err
+		return Anchor_List{}, err
 	}
 	err = s.Struct.SetPtr(0, l.List.ToPtr())
 	return l, err
@@ -538,22 +328,28 @@ func (s AnchorProvider_walk_Params) String() string {
 	return str
 }
 
-func (s AnchorProvider_walk_Params) Path() (string, error) {
+func (s AnchorProvider_walk_Params) Path() (capnp.TextList, error) {
 	p, err := s.Struct.Ptr(0)
-	return p.Text(), err
+	return capnp.TextList{List: p.List()}, err
 }
 
 func (s AnchorProvider_walk_Params) HasPath() bool {
 	return s.Struct.HasPtr(0)
 }
 
-func (s AnchorProvider_walk_Params) PathBytes() ([]byte, error) {
-	p, err := s.Struct.Ptr(0)
-	return p.TextBytes(), err
+func (s AnchorProvider_walk_Params) SetPath(v capnp.TextList) error {
+	return s.Struct.SetPtr(0, v.List.ToPtr())
 }
 
-func (s AnchorProvider_walk_Params) SetPath(v string) error {
-	return s.Struct.SetText(0, v)
+// NewPath sets the path field to a newly
+// allocated capnp.TextList, preferring placement in s's segment.
+func (s AnchorProvider_walk_Params) NewPath(n int32) (capnp.TextList, error) {
+	l, err := capnp.NewTextList(s.Struct.Segment(), n)
+	if err != nil {
+		return capnp.TextList{}, err
+	}
+	err = s.Struct.SetPtr(0, l.List.ToPtr())
+	return l, err
 }
 
 // AnchorProvider_walk_Params_List is a list of AnchorProvider_walk_Params.
@@ -611,9 +407,9 @@ func (s AnchorProvider_walk_Results) String() string {
 	return str
 }
 
-func (s AnchorProvider_walk_Results) Anchor() Anchor {
-	p, _ := s.Struct.Ptr(0)
-	return Anchor{Client: p.Interface().Client()}
+func (s AnchorProvider_walk_Results) Anchor() (Anchor, error) {
+	p, err := s.Struct.Ptr(0)
+	return Anchor{Struct: p.Struct()}, err
 }
 
 func (s AnchorProvider_walk_Results) HasAnchor() bool {
@@ -621,12 +417,18 @@ func (s AnchorProvider_walk_Results) HasAnchor() bool {
 }
 
 func (s AnchorProvider_walk_Results) SetAnchor(v Anchor) error {
-	if !v.Client.IsValid() {
-		return s.Struct.SetPtr(0, capnp.Ptr{})
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
+}
+
+// NewAnchor sets the anchor field to a newly
+// allocated Anchor struct, preferring placement in s's segment.
+func (s AnchorProvider_walk_Results) NewAnchor() (Anchor, error) {
+	ss, err := NewAnchor(s.Struct.Segment())
+	if err != nil {
+		return Anchor{}, err
 	}
-	seg := s.Segment()
-	in := capnp.NewInterface(seg, seg.Message().AddCap(v.Client))
-	return s.Struct.SetPtr(0, in.ToPtr())
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
+	return ss, err
 }
 
 // AnchorProvider_walk_Results_List is a list of AnchorProvider_walk_Results.
@@ -659,8 +461,480 @@ func (p AnchorProvider_walk_Results_Future) Struct() (AnchorProvider_walk_Result
 	return AnchorProvider_walk_Results{s}, err
 }
 
-func (p AnchorProvider_walk_Results_Future) Anchor() Anchor {
-	return Anchor{Client: p.Future.Field(0, nil).Client()}
+func (p AnchorProvider_walk_Results_Future) Anchor() Anchor_Future {
+	return Anchor_Future{Future: p.Future.Field(0, nil)}
+}
+
+type Anchor struct{ capnp.Struct }
+
+// Anchor_TypeID is the unique identifier for the type Anchor.
+const Anchor_TypeID = 0xbe89922d1c49d9c5
+
+func NewAnchor(s *capnp.Segment) (Anchor, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Anchor{st}, err
+}
+
+func NewRootAnchor(s *capnp.Segment) (Anchor, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Anchor{st}, err
+}
+
+func ReadRootAnchor(msg *capnp.Message) (Anchor, error) {
+	root, err := msg.Root()
+	return Anchor{root.Struct()}, err
+}
+
+func (s Anchor) String() string {
+	str, _ := text.Marshal(0xbe89922d1c49d9c5, s.Struct)
+	return str
+}
+
+func (s Anchor) Path() (string, error) {
+	p, err := s.Struct.Ptr(0)
+	return p.Text(), err
+}
+
+func (s Anchor) HasPath() bool {
+	return s.Struct.HasPtr(0)
+}
+
+func (s Anchor) PathBytes() ([]byte, error) {
+	p, err := s.Struct.Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Anchor) SetPath(v string) error {
+	return s.Struct.SetText(0, v)
+}
+
+func (s Anchor) Container() Anchor_Container {
+	p, _ := s.Struct.Ptr(1)
+	return Anchor_Container{Client: p.Interface().Client()}
+}
+
+func (s Anchor) HasContainer() bool {
+	return s.Struct.HasPtr(1)
+}
+
+func (s Anchor) SetContainer(v Anchor_Container) error {
+	if !v.Client.IsValid() {
+		return s.Struct.SetPtr(1, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().AddCap(v.Client))
+	return s.Struct.SetPtr(1, in.ToPtr())
+}
+
+// Anchor_List is a list of Anchor.
+type Anchor_List struct{ capnp.List }
+
+// NewAnchor creates a new list of Anchor.
+func NewAnchor_List(s *capnp.Segment, sz int32) (Anchor_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	return Anchor_List{l}, err
+}
+
+func (s Anchor_List) At(i int) Anchor { return Anchor{s.List.Struct(i)} }
+
+func (s Anchor_List) Set(i int, v Anchor) error { return s.List.SetStruct(i, v.Struct) }
+
+func (s Anchor_List) String() string {
+	str, _ := text.MarshalList(0xbe89922d1c49d9c5, s.List)
+	return str
+}
+
+// Anchor_Future is a wrapper for a Anchor promised by a client call.
+type Anchor_Future struct{ *capnp.Future }
+
+func (p Anchor_Future) Struct() (Anchor, error) {
+	s, err := p.Future.Struct()
+	return Anchor{s}, err
+}
+
+func (p Anchor_Future) Container() Anchor_Container {
+	return Anchor_Container{Client: p.Future.Field(1, nil).Client()}
+}
+
+type Anchor_Container struct{ Client *capnp.Client }
+
+// Anchor_Container_TypeID is the unique identifier for the type Anchor_Container.
+const Anchor_Container_TypeID = 0xd7d0cd94ccdd8e42
+
+func (c Anchor_Container) Set(ctx context.Context, params func(Anchor_Container_set_Params) error) (Anchor_Container_set_Results_Future, capnp.ReleaseFunc) {
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xd7d0cd94ccdd8e42,
+			MethodID:      0,
+			InterfaceName: "cluster.capnp:Anchor.Container",
+			MethodName:    "set",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Anchor_Container_set_Params{Struct: s}) }
+	}
+	ans, release := c.Client.SendCall(ctx, s)
+	return Anchor_Container_set_Results_Future{Future: ans.Future()}, release
+}
+func (c Anchor_Container) Get(ctx context.Context, params func(Anchor_Container_get_Params) error) (Anchor_Container_get_Results_Future, capnp.ReleaseFunc) {
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xd7d0cd94ccdd8e42,
+			MethodID:      1,
+			InterfaceName: "cluster.capnp:Anchor.Container",
+			MethodName:    "get",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 0}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Anchor_Container_get_Params{Struct: s}) }
+	}
+	ans, release := c.Client.SendCall(ctx, s)
+	return Anchor_Container_get_Results_Future{Future: ans.Future()}, release
+}
+
+func (c Anchor_Container) AddRef() Anchor_Container {
+	return Anchor_Container{
+		Client: c.Client.AddRef(),
+	}
+}
+
+func (c Anchor_Container) Release() {
+	c.Client.Release()
+}
+
+// A Anchor_Container_Server is a Anchor_Container with a local implementation.
+type Anchor_Container_Server interface {
+	Set(context.Context, Anchor_Container_set) error
+
+	Get(context.Context, Anchor_Container_get) error
+}
+
+// Anchor_Container_NewServer creates a new Server from an implementation of Anchor_Container_Server.
+func Anchor_Container_NewServer(s Anchor_Container_Server, policy *server.Policy) *server.Server {
+	c, _ := s.(server.Shutdowner)
+	return server.New(Anchor_Container_Methods(nil, s), s, c, policy)
+}
+
+// Anchor_Container_ServerToClient creates a new Client from an implementation of Anchor_Container_Server.
+// The caller is responsible for calling Release on the returned Client.
+func Anchor_Container_ServerToClient(s Anchor_Container_Server, policy *server.Policy) Anchor_Container {
+	return Anchor_Container{Client: capnp.NewClient(Anchor_Container_NewServer(s, policy))}
+}
+
+// Anchor_Container_Methods appends Methods to a slice that invoke the methods on s.
+// This can be used to create a more complicated Server.
+func Anchor_Container_Methods(methods []server.Method, s Anchor_Container_Server) []server.Method {
+	if cap(methods) == 0 {
+		methods = make([]server.Method, 0, 2)
+	}
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xd7d0cd94ccdd8e42,
+			MethodID:      0,
+			InterfaceName: "cluster.capnp:Anchor.Container",
+			MethodName:    "set",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Set(ctx, Anchor_Container_set{call})
+		},
+	})
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xd7d0cd94ccdd8e42,
+			MethodID:      1,
+			InterfaceName: "cluster.capnp:Anchor.Container",
+			MethodName:    "get",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Get(ctx, Anchor_Container_get{call})
+		},
+	})
+
+	return methods
+}
+
+// Anchor_Container_set holds the state for a server call to Anchor_Container.set.
+// See server.Call for documentation.
+type Anchor_Container_set struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Anchor_Container_set) Args() Anchor_Container_set_Params {
+	return Anchor_Container_set_Params{Struct: c.Call.Args()}
+}
+
+// AllocResults allocates the results struct.
+func (c Anchor_Container_set) AllocResults() (Anchor_Container_set_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Anchor_Container_set_Results{Struct: r}, err
+}
+
+// Anchor_Container_get holds the state for a server call to Anchor_Container.get.
+// See server.Call for documentation.
+type Anchor_Container_get struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Anchor_Container_get) Args() Anchor_Container_get_Params {
+	return Anchor_Container_get_Params{Struct: c.Call.Args()}
+}
+
+// AllocResults allocates the results struct.
+func (c Anchor_Container_get) AllocResults() (Anchor_Container_get_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Anchor_Container_get_Results{Struct: r}, err
+}
+
+type Anchor_Container_set_Params struct{ capnp.Struct }
+
+// Anchor_Container_set_Params_TypeID is the unique identifier for the type Anchor_Container_set_Params.
+const Anchor_Container_set_Params_TypeID = 0x99cd2eea5bcaaf5a
+
+func NewAnchor_Container_set_Params(s *capnp.Segment) (Anchor_Container_set_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Anchor_Container_set_Params{st}, err
+}
+
+func NewRootAnchor_Container_set_Params(s *capnp.Segment) (Anchor_Container_set_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Anchor_Container_set_Params{st}, err
+}
+
+func ReadRootAnchor_Container_set_Params(msg *capnp.Message) (Anchor_Container_set_Params, error) {
+	root, err := msg.Root()
+	return Anchor_Container_set_Params{root.Struct()}, err
+}
+
+func (s Anchor_Container_set_Params) String() string {
+	str, _ := text.Marshal(0x99cd2eea5bcaaf5a, s.Struct)
+	return str
+}
+
+func (s Anchor_Container_set_Params) Data() ([]byte, error) {
+	p, err := s.Struct.Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Anchor_Container_set_Params) HasData() bool {
+	return s.Struct.HasPtr(0)
+}
+
+func (s Anchor_Container_set_Params) SetData(v []byte) error {
+	return s.Struct.SetData(0, v)
+}
+
+// Anchor_Container_set_Params_List is a list of Anchor_Container_set_Params.
+type Anchor_Container_set_Params_List struct{ capnp.List }
+
+// NewAnchor_Container_set_Params creates a new list of Anchor_Container_set_Params.
+func NewAnchor_Container_set_Params_List(s *capnp.Segment, sz int32) (Anchor_Container_set_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return Anchor_Container_set_Params_List{l}, err
+}
+
+func (s Anchor_Container_set_Params_List) At(i int) Anchor_Container_set_Params {
+	return Anchor_Container_set_Params{s.List.Struct(i)}
+}
+
+func (s Anchor_Container_set_Params_List) Set(i int, v Anchor_Container_set_Params) error {
+	return s.List.SetStruct(i, v.Struct)
+}
+
+func (s Anchor_Container_set_Params_List) String() string {
+	str, _ := text.MarshalList(0x99cd2eea5bcaaf5a, s.List)
+	return str
+}
+
+// Anchor_Container_set_Params_Future is a wrapper for a Anchor_Container_set_Params promised by a client call.
+type Anchor_Container_set_Params_Future struct{ *capnp.Future }
+
+func (p Anchor_Container_set_Params_Future) Struct() (Anchor_Container_set_Params, error) {
+	s, err := p.Future.Struct()
+	return Anchor_Container_set_Params{s}, err
+}
+
+type Anchor_Container_set_Results struct{ capnp.Struct }
+
+// Anchor_Container_set_Results_TypeID is the unique identifier for the type Anchor_Container_set_Results.
+const Anchor_Container_set_Results_TypeID = 0x8c20aa60ea5037a3
+
+func NewAnchor_Container_set_Results(s *capnp.Segment) (Anchor_Container_set_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Anchor_Container_set_Results{st}, err
+}
+
+func NewRootAnchor_Container_set_Results(s *capnp.Segment) (Anchor_Container_set_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Anchor_Container_set_Results{st}, err
+}
+
+func ReadRootAnchor_Container_set_Results(msg *capnp.Message) (Anchor_Container_set_Results, error) {
+	root, err := msg.Root()
+	return Anchor_Container_set_Results{root.Struct()}, err
+}
+
+func (s Anchor_Container_set_Results) String() string {
+	str, _ := text.Marshal(0x8c20aa60ea5037a3, s.Struct)
+	return str
+}
+
+// Anchor_Container_set_Results_List is a list of Anchor_Container_set_Results.
+type Anchor_Container_set_Results_List struct{ capnp.List }
+
+// NewAnchor_Container_set_Results creates a new list of Anchor_Container_set_Results.
+func NewAnchor_Container_set_Results_List(s *capnp.Segment, sz int32) (Anchor_Container_set_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return Anchor_Container_set_Results_List{l}, err
+}
+
+func (s Anchor_Container_set_Results_List) At(i int) Anchor_Container_set_Results {
+	return Anchor_Container_set_Results{s.List.Struct(i)}
+}
+
+func (s Anchor_Container_set_Results_List) Set(i int, v Anchor_Container_set_Results) error {
+	return s.List.SetStruct(i, v.Struct)
+}
+
+func (s Anchor_Container_set_Results_List) String() string {
+	str, _ := text.MarshalList(0x8c20aa60ea5037a3, s.List)
+	return str
+}
+
+// Anchor_Container_set_Results_Future is a wrapper for a Anchor_Container_set_Results promised by a client call.
+type Anchor_Container_set_Results_Future struct{ *capnp.Future }
+
+func (p Anchor_Container_set_Results_Future) Struct() (Anchor_Container_set_Results, error) {
+	s, err := p.Future.Struct()
+	return Anchor_Container_set_Results{s}, err
+}
+
+type Anchor_Container_get_Params struct{ capnp.Struct }
+
+// Anchor_Container_get_Params_TypeID is the unique identifier for the type Anchor_Container_get_Params.
+const Anchor_Container_get_Params_TypeID = 0xf9ab4330477726ec
+
+func NewAnchor_Container_get_Params(s *capnp.Segment) (Anchor_Container_get_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Anchor_Container_get_Params{st}, err
+}
+
+func NewRootAnchor_Container_get_Params(s *capnp.Segment) (Anchor_Container_get_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Anchor_Container_get_Params{st}, err
+}
+
+func ReadRootAnchor_Container_get_Params(msg *capnp.Message) (Anchor_Container_get_Params, error) {
+	root, err := msg.Root()
+	return Anchor_Container_get_Params{root.Struct()}, err
+}
+
+func (s Anchor_Container_get_Params) String() string {
+	str, _ := text.Marshal(0xf9ab4330477726ec, s.Struct)
+	return str
+}
+
+// Anchor_Container_get_Params_List is a list of Anchor_Container_get_Params.
+type Anchor_Container_get_Params_List struct{ capnp.List }
+
+// NewAnchor_Container_get_Params creates a new list of Anchor_Container_get_Params.
+func NewAnchor_Container_get_Params_List(s *capnp.Segment, sz int32) (Anchor_Container_get_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return Anchor_Container_get_Params_List{l}, err
+}
+
+func (s Anchor_Container_get_Params_List) At(i int) Anchor_Container_get_Params {
+	return Anchor_Container_get_Params{s.List.Struct(i)}
+}
+
+func (s Anchor_Container_get_Params_List) Set(i int, v Anchor_Container_get_Params) error {
+	return s.List.SetStruct(i, v.Struct)
+}
+
+func (s Anchor_Container_get_Params_List) String() string {
+	str, _ := text.MarshalList(0xf9ab4330477726ec, s.List)
+	return str
+}
+
+// Anchor_Container_get_Params_Future is a wrapper for a Anchor_Container_get_Params promised by a client call.
+type Anchor_Container_get_Params_Future struct{ *capnp.Future }
+
+func (p Anchor_Container_get_Params_Future) Struct() (Anchor_Container_get_Params, error) {
+	s, err := p.Future.Struct()
+	return Anchor_Container_get_Params{s}, err
+}
+
+type Anchor_Container_get_Results struct{ capnp.Struct }
+
+// Anchor_Container_get_Results_TypeID is the unique identifier for the type Anchor_Container_get_Results.
+const Anchor_Container_get_Results_TypeID = 0xc09391084f16d7a6
+
+func NewAnchor_Container_get_Results(s *capnp.Segment) (Anchor_Container_get_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Anchor_Container_get_Results{st}, err
+}
+
+func NewRootAnchor_Container_get_Results(s *capnp.Segment) (Anchor_Container_get_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Anchor_Container_get_Results{st}, err
+}
+
+func ReadRootAnchor_Container_get_Results(msg *capnp.Message) (Anchor_Container_get_Results, error) {
+	root, err := msg.Root()
+	return Anchor_Container_get_Results{root.Struct()}, err
+}
+
+func (s Anchor_Container_get_Results) String() string {
+	str, _ := text.Marshal(0xc09391084f16d7a6, s.Struct)
+	return str
+}
+
+func (s Anchor_Container_get_Results) Data() ([]byte, error) {
+	p, err := s.Struct.Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Anchor_Container_get_Results) HasData() bool {
+	return s.Struct.HasPtr(0)
+}
+
+func (s Anchor_Container_get_Results) SetData(v []byte) error {
+	return s.Struct.SetData(0, v)
+}
+
+// Anchor_Container_get_Results_List is a list of Anchor_Container_get_Results.
+type Anchor_Container_get_Results_List struct{ capnp.List }
+
+// NewAnchor_Container_get_Results creates a new list of Anchor_Container_get_Results.
+func NewAnchor_Container_get_Results_List(s *capnp.Segment, sz int32) (Anchor_Container_get_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return Anchor_Container_get_Results_List{l}, err
+}
+
+func (s Anchor_Container_get_Results_List) At(i int) Anchor_Container_get_Results {
+	return Anchor_Container_get_Results{s.List.Struct(i)}
+}
+
+func (s Anchor_Container_get_Results_List) Set(i int, v Anchor_Container_get_Results) error {
+	return s.List.SetStruct(i, v.Struct)
+}
+
+func (s Anchor_Container_get_Results_List) String() string {
+	str, _ := text.MarshalList(0xc09391084f16d7a6, s.List)
+	return str
+}
+
+// Anchor_Container_get_Results_Future is a wrapper for a Anchor_Container_get_Results promised by a client call.
+type Anchor_Container_get_Results_Future struct{ *capnp.Future }
+
+func (p Anchor_Container_get_Results_Future) Struct() (Anchor_Container_get_Results, error) {
+	s, err := p.Future.Struct()
+	return Anchor_Container_get_Results{s}, err
 }
 
 type View struct{ Client *capnp.Client }
@@ -1399,86 +1673,100 @@ func (p View_lookup_Results_Future) Record() View_Record_Future {
 	return View_Record_Future{Future: p.Future.Field(0, nil)}
 }
 
-const schema_fcf6ac08e448a6ac = "x\xda\x9cU]h\x1cU\x14>\xe7\xde\x99\x9d\xdd\x92" +
-	"f{sS$\xd5\xa2\xe8\x8aM$\xdb\x84\xb4\x0f\xae" +
-	"\xe2l\x97\x94$Ea'M\x04}\x91e3\x90\x90" +
-	"I6\xcel\xdc'\x09E\xda\xa2\x0fb\x95\xf8Ph" +
-	"\xc1\xc2\x86*-\xc6\"\x85\x14R\xe8\x83\x95\x80Z\x8c" +
-	"\x16\xa9>\xa8E\x85\x0a\xfe\x04ET\x12W\xee\x9d\xbd" +
-	"3\x93\xed\xc6\xbf\xa7]f\xce\xfd\xcew\xbe\xf3}w" +
-	"z\x9e&Y\xd2\xab\x9b\x06\x805\xa2\xc7j\x9d\xc6\xf8" +
-	"\x91\xcfo^=\x02l7\x02\xe8h\x00\xf4\x1d\xa5\x87" +
-	"\x10\x90\x9f\xa0&`\xad\xed\xe1\xd3\xab\xf7-\xbd\xfc<" +
-	"\xb0;\x11@\x13\xef\xdf\xa6\xc3\x08Z\xeddj\xfd\xa9" +
-	"\xbe\x9fv\xbf\x08\xac\x95\xd6\xce-\x0c~\x1d?\xf7\xeb" +
-	":\x00\xf2S\xf4$\xaf\xd2\x07\x00\xf8\x12=\xce\x13\xe2" +
-	"Lm\xf9\xf4\x1b\x17?\x9cZz\xc9\x87\xf1\xfb\xac\xf9" +
-	"}6d\x9f\x9b{\xf7\xa6.\x99'\xce\xdf\x86\xd6\xad" +
-	"}\xc7\x1f\x12\x18|\xbfv\x9c\x1f\x95h??\xba\xf6" +
-	"\xde1wc\x11\xd8\xce\x00mJk\x13h\xb3\x9a@" +
-	"\x9b\xbe\xba\xb0\xda\xf1{\xf6Rt\xacymX\x14\xbc" +
-	".\x0b\xce\x8c\xf6\x9c=\xbch,G\x0b\xaeh\x19Q" +
-	"\xb0\"\x0b\xde\xbd1tW\xf7+/\\\xbe\x8d\xcf-" +
-	"\xedM\xbe&\xf9|\xaf\x0d\xf0\x9d\xba\xe0s\xcfs\x87" +
-	"/\\\xce]\xfb\x00,\x8e$\x14F\xc2\xf2\x0dm\x95" +
-	"'D\x19\xd7\xf5\xb7\x00kw|R\x1d]|\xed\xa3" +
-	"k\xd1\xd6\xa7\xf4\x9ch]\xd5E\xeb\xeb\xf3\xe7\x8f\xbd" +
-	"\xb3R\xf9\xd8\x9fNJ~]\xdf&$w\xf6<\xf8" +
-	"\xdb\xc8\x97\x9d7\x80qu\x94/\xeb\x7f\x00\xf2+\xf2" +
-	"\xe4\x8f\x9f\xde}\xb1\xff\xfdC\xdf\x08\x1e\x01\xf6W\xba" +
-	"\x14\xe6\x96^\x01\xac\xf1\xf5\xb3\x03m\x85/\xbe\xf5\x11" +
-	"$\xf6\xc1\x18\x11\xd8\xf4\x913\x17\x8a\x0b\xaf\xfe\x00\x8c" +
-	"\xd3p\x04@\xde\x19\xfb\x8c\xef\x8f\x89V\xbd\xb1\x01\xfe" +
-	"\xa4\xf8\xf7gv\xdf\xcahu\xfe\x97\x90F\xdf\x81\xd8" +
-	"6\xd1e(fBw\xad\xe8\xccze\xdbMk\xc5" +
-	"\xc2\xcc\xf4L\xe6\xc0tq\xbc\xe4\xe6\xdd\xd2\xb3\x13c" +
-	"\xb6\x9b\xae\x14\x9c\xc9T\xbe\xe0\x16\xa6<\x00K\xa3\x1a" +
-	"\x80\x86\x00l{\x17\x80\x15\xa7h\xb5\x13L\xce\x14\xca" +
-	"\xe3\xd8\x02\x04[\x00\x1b\xf1\x9e\x98\xb0+\xe9\xc1\xc2\xf4" +
-	"\x98c\xbb\xe9q\xf9\x9b\x1a\xb6\xbdY\xa7\x8c^P\x8b" +
-	"\xaa\x96\xda\x15+\x8e\x18\x190\x91\x0b7\xc6\xf4\xcc\\" +
-	"\x1d\xca\x1c\xb6\x8b%w\xcc\x8aS\x1d \xd0\x1a\x95d" +
-	"\xac\xb7\x0b\x08\xbb\xdf@T\xe3\x87z\xb3\x8e\x0c\x10\xb6" +
-	"\xddHN\x94m7\x8b\xa6S*M\xce\xced1\x8f" +
-	"\xff\x8a|31ru1R\x04\xe7\\I\xcc\xc3V" +
-	"\xc0<E\xdc\x11\xd2\x07\x14\x0f\x83\x1e\xa4Q\xf0\xa4P" +
-	"<\x8fX\x1fJ\xd9\x1e\x95\x09Y\xef\xae\xfaP\xc1U" +
-	"\x80*<\xac\xa3K\x0eE\x1d/\x8bI\xb1\xb5\xcd\x03" +
-	"\xd1h\xb3\xb4XX\xb0\x85\xff\xb3\xd5f.i\x86\x97" +
-	"\x09\xf1\xcc\x82<\x83,\x8c+ 2\xd8\x82c\x80\xed" +
-	"x)\xd3\xd7\xfc?\x11E\x05\x96\x94h\x88\x96&U" +
-	"U\x81Eu/1&\x94\xd3\x0d\x09\xb3Y4\x12q" +
-	"\x81\xf4\x1b\x8e\x09\xa0\x96\x80\xc6AA#K\xd1z\x8c" +
-	" b\xbb\xc81\x1b\xba\x17\xc0\xea\xa7h\xe5\x092\x82" +
-	"\xedH\x00\xd8\xe3\xe2\xe1 EkD\xf0\xb5mW\xf1" +
-	"5\xcae\x07u \xa8\x03\x1a\x9e\xfd\x0c&\x80`\xe2" +
-	"\x1f\x05w\xbc\xba\xdc\xde\x96>\xf4\xe5\x0e|\xb8Y\xf6" +
-	"V\xf8[k(\x8f7UB\xc4\xa6\xd9Jr\xe1J" +
-	"\xe6\xfc\xac\x88e\x07In\xbel\x89\xe8'04P" +
-	"<\x00\xed\x14\x06JQ\xb4zB\x81\xbbw\x01X{" +
-	"(Z\xfb\x08\x9a~\xda\x1aR\xb6\x03\x90\x96&\x11\x81" +
-	" FZ\xc6\x1a\x87P\x12\xaa\x82\xc6\xd0S;b\x1c" +
-	"\xf5UD\xf5\x95e,#\x8dc\xfa\xc36\xcd[t" +
-	"\xbcf\x17G4\x1f\xc2\x16C\xfd\xca\x18\x7f\x05\x00\x00" +
-	"\xff\xffAe8P"
+const schema_fcf6ac08e448a6ac = "x\xda\x9cV]h\x1cU\x14>g\xee\xcc\xceF\x92" +
+	"lnnjI5\xb4\xc4\x8d6\xd1n\xb3\xa4\xa2]" +
+	"\x85]\xb7\x09I\x8a\xc1\x9dm#\x18_:$C\x13" +
+	"\xb2\xddMg6\xe6)\x84\"%(R\x8cU\xc1\x82" +
+	"\x05+\x0dmmh\xe9C!\x85\x14}hAi\xac" +
+	"\x0dB\x88\"\xdab}\x08\xe2\x0f\xa8\xd8\x92\xbarg" +
+	"rwn\xd7\xad\x0d}\xd9\xbd\xec\x9e\xf9\xcew\xbe\xf3" +
+	"\x9ds\xa7uII(Q\xad3\x08`\xec\xd1\x02\x85" +
+	"f}\xf0\xc0\xb77.\x1f\x00\xda\x80\x00\x1a\xea\x00m" +
+	"\x15\xeaN\x04d\xeb\xd48`\xa1\xf6\xb9\xa3\x0b\x8f\xcd" +
+	"\xbe\xfd:\xd0G\x10@\xe5\xffw\xa8i\x04\xb5p$" +
+	"\xbc\xd2\xd7\xf6[\xc3\x9b@\xabI\xe1\xf4t\xd7\x8f\xc1" +
+	"\xd3\x7f\xad\x00 \x8b\xaaG\xd8v\xf5\x09\x00\xd6\xa3N" +
+	"\xb2\x0f\xf93\x85\x8f\x9fI-\xef9\xb5\xe9-\xa0\x1b" +
+	"\x05\xccA\xb5\x8f\xc3\xcc\x1d=y\xfe\xcb}\xb3\x87\xbc" +
+	"\x04\x1e\x83\xfd\x1e\x83q\x97A\xdf\x99/^]\x8e\xcc" +
+	"\x7f\xe0=\xea\x05\xccp\x0a\xc8f\xdd\x80\x1b[\xb7\x86" +
+	"/\xc4\xa7f\xfeCdI]f7y.v]\x9d" +
+	"dQ\x8d\x13\xc9^\x9e^\xa8\xbf\x95\xb8 \x17\\\xaf" +
+	"\xb9hM\x1aG;\xd6\xdbzb\xd7Y}N\x0e\xe8" +
+	"\xd0b<\xa0\xc7\x0d\xb8\xb4\xd4\xfd\xe8\x96w\xde\xb8\x08" +
+	"\xb4\x1a\xfdt\x9a\xc2\xf3\x8ck\xa7\xd8Am=\x00\x9b" +
+	"\xd2\xc6\x00\x0b\xd3\x8b\x0f\xbf\x14\x9c:\xfc\xa9\xcc\xfdw" +
+	"\xad\x8f\x83\xddq\xc16\x8d\xef:w1yu\x1e\x0c" +
+	"\x86\x8a/\xa9\x1b\xc9\x1a\x02\x0b\xac9\xc0OM\x813" +
+	"\x80\x85\xf5_\x1f\xef=\xfb\xfe\xb5\xab2\xb5\xb9@\x92" +
+	"\xa3]\x0ap\xb4\xe4\xa1\xef\xae\xbc;\xff\xd5\"\xd0u" +
+	"\xc4\xe7\x09\xc8\xfe\x0c\xdcf\xa8s\xa4;\x81I\xd6\xc3" +
+	"O\x85\xcc\xe6'\xff\xde\xfdC\xf3\x12P&\xd0\xd8\xd3" +
+	"\xfam@\xb6]\xe7`\xbf.n<\xdf~e\xe7M" +
+	"N\xad\x98\xee\x15\xbd\x96\xa73u^\x1d[9\xd1Y" +
+	"k~\xff\x93\x87\xe06uNWxS\xc9\xf3\xc7\xce" +
+	"\xf5O\x1f\xfe\x05(#~U\x80\xec#\xfd\x1b6\xe3" +
+	"\x129\xa9w\xb2k\xfc\xf4Ob\xdb\xe7\xbd\xc7\xdf\xfb" +
+	"\xc3\xa7\xd16\xab?\xc4\xb3|\xe6\xf2\xf8\xf9\xf1\xb1\xce" +
+	"\xd6\x1d\x9f\xdc\x92\xacs]O#\xb4\x16\xfa3\xa3N" +
+	"\xde\xb2#j\xbf9\x92\x1d\x89\xbd\x90\xed\x1f\xcc\xd9)" +
+	";\xf7\xda\xd0\x80eG\xc6\xcc\xccp8e\xda\xe6>" +
+	"\x07\xc0P\x89\x0a\xa0\"\x00\xadj\x010\x82\x04\x8d\xb0" +
+	"\x82\xa1\x113?\x88\xd5\x80)\x82X\x09\x0a?\x96\xc2" +
+	"\xbe<d\x8dE\xba\xcc\xec@\xc6\xb2#\x83\xeew8" +
+	"m9\xa3\x99<:\xc5X\x14\xb1\xc4\x1a3\x82\x88\x92" +
+	"\x02\x15I\xbf\xcbT\x8bM\xacB\xc5\xd3V\x7f\xce\x1e" +
+	"0\x82D\x93\x9a\x81BS\x1am\x01\x856\xe9\x88B" +
+	"\x1f\xbf!\xb4>\x06\x0a\xad\xd2CCy\xcbN`<" +
+	"\x93\xcb\x0d\x8f\x8e$0\x85X^\x93\xc8\x8e\\6o" +
+	"\x0ee-;\xe2Xy\x8f=\xc9;k\xa9\xb4\x9c\x80" +
+	"I_\xc0\x09\xdb\xad\xc2\x11\x1a\xd6\xf8\xb5\x02\x96S\xb3" +
+	",!7\x09:\xe5\x9aT\xa7`h\xc0\xcc\x9bX\x05" +
+	"\x0aVIxJi\xd3C\xbc\xeb)\xc4UE\xc5\x1c" +
+	"\xa3\x98\x1a\x1a\xdd\xb0\xaahq\xeb\xa1\xd8\x06\xb4\xbe\xc5" +
+	"U\x94d\x9c\x04\x86\xb8s\xfeG\xcd\xbb\x1d&\xac " +
+	"\x93\x8f\xf9\xe4\xe3\xa6\xfb\x0c\xd6\xc8\xf3\x885R!\xa4" +
+	",v\xc6\x09\xc7=\xed\x1f\xc4\xba(0C\x1c\xd4P" +
+	"Q\xde\x0d\x98.\x08\xf9\x01m#X\x84o\xe6\xf0a" +
+	"\x82F\xab\x82\x14\xb1\x8e\x8f=\xdd\x92\x060\x9e\"h" +
+	"<+r\xf2d\x95<\x99\x0f\x82\xd4\xc7\x07D\xba\x86" +
+	"\xbe\xef\x95\x8c\xf8 \x8dw\xcd\xea\xce\x10\x0e\xf0\xaeW" +
+	"\x16!:8D\x82\xa0\xf1\xa2\x82\xa2\x8a\xeeF\x00\xa3" +
+	"\x9d\xa0\x91R\x90*X\x87\x0a\x00\xed\xe1?v\x114" +
+	"v\xf3\xd2,\xcb\x16\xa5\xe9\xf9|\x065PP\x03\xd4" +
+	"\x1dk?V\x80\x82\x15p??d\x9cU78\xf7" +
+	"\x1c\x17\xcf\x0d\xd2\xb8\xc8\xae\xa8\xbe\x97\xbd\xb9lqO" +
+	"7\xdf\xe0\xe2^Dq\xb7\xd2h\xa30\xb8\xd8\x99(" +
+	". Z\xdf\xe8\x1a\\w\xac|\x02\xf5\xbd\xfcS6" +
+	"\xb8,*\xdf*\xe5\xcc\x97\xf4;3\xe1m\x07\xde\xf7" +
+	"\xe2\xa2+\xe9;\x91\x10\xbd\x05\xe5\x8f\x8ad\xb9\x98o" +
+	"\xb9\xa2\xe36\x00\x18\x9b\x09\x1a\xdb\x14\x8c{\xfb\xa5d" +
+	"\xaf\xd4\x00\x92\xdc0\"(\x88R\xca@i\x11\xa2\x1b" +
+	"\"\xa0t\xcd\x11OO\xd5\xd5S\xbc\x88\xa0x\xe5\xa1" +
+	"\x94\xafYM\x8f{\xc5\xde-X\x99\xf2\xca\xadJy" +
+	"\x13p\x87u\xb7\xfb\xe3\xb3\x86\x01Y]\x8c\xff\x06\x00" +
+	"\x00\xff\xffN \xb0{"
 
 func init() {
 	schemas.Register(schema_fcf6ac08e448a6ac,
 		0x81c6e2db81680729,
 		0x8390b923d29e3b12,
 		0x8a1df0335afc249a,
+		0x8c20aa60ea5037a3,
 		0x8eb96dceb6a99ebd,
+		0x99cd2eea5bcaaf5a,
 		0xad913fba242f2fe2,
-		0xb0fd7286c7f13ef3,
 		0xba40f919d2a6c66e,
 		0xbd07b053a83055a2,
 		0xbe89922d1c49d9c5,
+		0xc09391084f16d7a6,
 		0xcdcf42beb2537d20,
 		0xcfd196b055a5d417,
-		0xd377c9b486ad95d5,
+		0xd7d0cd94ccdd8e42,
 		0xd929e054f82b286c,
 		0xe54acc44b61fd7ef,
 		0xe6df611247a8fc13,
 		0xee93a663b2a23c03,
-		0xf495a555c9344000)
+		0xf495a555c9344000,
+		0xf9ab4330477726ec)
 }

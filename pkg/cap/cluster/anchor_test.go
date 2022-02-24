@@ -84,3 +84,44 @@ func TestInvalidHostAnchor(t *testing.T) {
 	require.Nil(t, a)
 	require.ErrorIs(t, err, anchor.ErrInvalidPath)
 }
+
+func TestContainerAnchor(t *testing.T) {
+	t.Parallel()
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dl := time.Now().Add(time.Second * 10)
+	var rt = make(routingTable, 65)
+	for i := range rt {
+		rt[i] = record{
+			id:  newID(),
+			ttl: time.Second * 10,
+			seq: uint64(i),
+			dl:  dl,
+		}
+	}
+
+	client := anchor.NewAnchorClient(rt)
+
+	path := append([]string{"/"}, rt[0].Peer().String(), "test")
+	a, err := client.Walk(ctx, path)
+	require.NoError(t, err)
+	require.NotNil(t, a)
+
+	container, ok := a.(anchor.ContainerAnchor)
+	require.True(t, ok)
+	require.NotNil(t, container)
+
+	data, err := container.Get(ctx)
+	require.NoError(t, err)
+	require.Empty(t, data)
+
+	err = container.Set(ctx, []byte("test"))
+	require.NoError(t, err)
+
+	data, err = container.Get(ctx)
+	require.NoError(t, err)
+	require.EqualValues(t, data, []byte("test"))
+}
