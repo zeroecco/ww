@@ -23,6 +23,5 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
-        binary_name: "ww"
-        build_flags: ./cmd/ww/main.go
+        build_command: go build -o ww ./cmd/ww/main.go
         extra_files: LICENSE-APACHE LICENSE-MIT README.md
